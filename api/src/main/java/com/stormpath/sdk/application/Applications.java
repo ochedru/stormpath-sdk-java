@@ -297,4 +297,7 @@ public final class Applications {
         return (OauthRequestAuthenticator) Classes.newInstance("com.stormpath.sdk.impl.oauth.authc.DefaultOauthRequestAuthenticator", application);
     }
 
+    public static  OauthRefreshGrantAuthenticator(Application application) {
+        return (OauthRefreshGrantAuthenticator) Classes.newInstance("com.stormpath.sdk.impl.oauth.authc.DefaultOauthRefreshGrantAuthenticator", application);
+    }
 }
