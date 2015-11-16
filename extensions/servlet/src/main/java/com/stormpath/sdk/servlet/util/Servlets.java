@@ -20,7 +20,9 @@ import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.lang.Classes;
 import com.stormpath.sdk.servlet.api.ServletApiRequestAuthenticator;
 import com.stormpath.sdk.servlet.api.impl.DefaultServletApiRequestAuthenticator;
+import com.stormpath.sdk.servlet.oauth.ServletOauthRefreshAuthenticator;
 import com.stormpath.sdk.servlet.oauth.ServletOauthRequestAuthenticator;
+import com.stormpath.sdk.servlet.oauth.impl.DefaultServletOauthRefreshAuthenticator;
 import com.stormpath.sdk.servlet.oauth.impl.DefaultServletOauthRequestAuthenticator;
 
 /**
@@ -40,4 +42,11 @@ public final class Servlets {
         return new DefaultServletOauthRequestAuthenticator(application);
     }
 
+    /**
+     * @since 1.0.RC6
+     */
+    public static ServletOauthRefreshAuthenticator servletOauthRefreshAuthenticator(Application application){
+        Assert.notNull(application, "application argument cannot be null.");
+        return new DefaultServletOauthRefreshAuthenticator(application);
+    }
 }
