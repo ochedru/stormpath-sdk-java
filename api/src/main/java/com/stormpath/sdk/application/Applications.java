@@ -18,6 +18,7 @@ package com.stormpath.sdk.application;
 import com.stormpath.sdk.account.VerificationEmailRequestBuilder;
 import com.stormpath.sdk.api.ApiRequestAuthenticator;
 import com.stormpath.sdk.lang.Classes;
+import com.stormpath.sdk.oauth.OauthRefreshGrantAuthenticator;
 import com.stormpath.sdk.oauth.OauthRequestAuthenticator;
 import com.stormpath.sdk.query.Criterion;
 import com.stormpath.sdk.query.DateExpressionFactory;
@@ -297,7 +298,10 @@ public final class Applications {
         return (OauthRequestAuthenticator) Classes.newInstance("com.stormpath.sdk.impl.oauth.authc.DefaultOauthRequestAuthenticator", application);
     }
 
-    public static  OauthRefreshGrantAuthenticator(Application application) {
+    /**
+     * @since 1.0.RC7
+     */
+    public static OauthRefreshGrantAuthenticator oauthRefreshGrantAuthenticator(Application application) {
         return (OauthRefreshGrantAuthenticator) Classes.newInstance("com.stormpath.sdk.impl.oauth.authc.DefaultOauthRefreshGrantAuthenticator", application);
     }
 }

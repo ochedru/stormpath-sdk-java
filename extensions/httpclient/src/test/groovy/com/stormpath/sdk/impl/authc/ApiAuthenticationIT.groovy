@@ -115,6 +115,42 @@ class ApiAuthenticationIT extends ClientIT {
 
     }
 
+    @Test
+    void testRefreshOauthToken() {
+
+        def apiKey = account.createApiKey()
+
+        def headers = createHttpHeaders(createBasicAuthzHeader(apiKey.id, apiKey.secret), "application/x-www-form-urlencoded")
+
+        HttpRequestBuilder httpRequestBuilder = HttpRequests.method(HttpMethod.POST)
+                .headers(headers)
+                .addParameter("grant_type", convertToArray("client_credentials"))
+
+        // Obtain an access token
+        def result = (AccessTokenResult) attemptSuccessfulApiAuthentication(httpRequestBuilder.build(), AccessTokenResult)
+
+        httpRequestBuilder.headers(createHttpHeaders(createBearerAuthzHeader(result.tokenResponse.accessToken), "application/json"))
+
+        // Attempt authentication with the Access Token
+        attemptSuccessfulApiAuthentication(httpRequestBuilder.build(), OauthAuthenticationResult)
+
+        headers = createHttpHeaders(createBasicAuthzHeader(apiKey.id, apiKey.secret), "application/x-www-form-urlencoded")
+
+        httpRequestBuilder = HttpRequests.method(HttpMethod.POST)
+                .headers(headers)
+                .addParameter("grant_type", convertToArray("refresh_token"))
+                .addParameter("refresh_token", result.tokenResponse.refreshToken)
+
+        // Obtain a new Access Token using the refresh token
+        def oauthRefreshTokenResult = (AccessTokenResult) Applications.oauthRefreshGrantAuthenticator(application)
+                .authenticate(httpRequestBuilder.build())
+
+        // Attempt authentication with the new access token
+        httpRequestBuilder.headers(createHttpHeaders(createBearerAuthzHeader(oauthRefreshTokenResult.tokenResponse.accessToken), "application/json"))
+
+        attemptSuccessfulApiAuthentication(httpRequestBuilder.build(), OauthAuthenticationResult)
+    }
+
     void testWithScopeFactory(ApiKey apiKey) {
 
         Set<String> applicationScopes = ["readResource", "deleteResource", "createResource", "updateResource"]
@@ -292,11 +328,6 @@ class ApiAuthenticationIT extends ClientIT {
         httpRequestBuilder = HttpRequests.method(HttpMethod.POST).headers(headers).parameters(parameters)
         verifyOauthError(httpRequestBuilder.build(), OauthAuthenticationException.UNSUPPORTED_GRANT_TYPE)
 
-        //Error: grant_type: refresh_token is not supported.
-        parameters = convertToParametersMap(["grant_type": "refresh_token", "refresh_token": "myrefresh_token", "anyParam": "ignored"])
-        httpRequestBuilder = HttpRequests.method(HttpMethod.POST).headers(headers).parameters(parameters)
-        verifyOauthError(httpRequestBuilder.build(), OauthAuthenticationException.UNSUPPORTED_GRANT_TYPE)
-
         parameters = convertToParametersMap(["grant_type": "client_credentials", "anyParam": "ignored"])
 
         //Error: invalid apiKey id.
@@ -384,7 +415,6 @@ class ApiAuthenticationIT extends ClientIT {
                 assertEquals 3, new StringTokenizer(tokenResponse.accessToken, ".").countTokens()
                 assertEquals tokenResponse.tokenType, "Bearer"
                 assertNotNull tokenResponse.expiresIn
-                assertNull tokenResponse.refreshToken
             }
         })
     }
