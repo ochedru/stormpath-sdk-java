@@ -17,6 +17,7 @@ package com.stormpath.sdk.impl.oauth.authc;
 
 import com.stormpath.sdk.authc.AuthenticationOptions;
 import com.stormpath.sdk.authc.AuthenticationRequest;
+import com.stormpath.sdk.authc.UsernamePasswordRequestBuilder;
 import com.stormpath.sdk.directory.AccountStore;
 import com.stormpath.sdk.error.authc.MissingApiKeyException;
 import com.stormpath.sdk.http.HttpRequest;
@@ -24,6 +25,7 @@ import com.stormpath.sdk.impl.error.ApiAuthenticationExceptionFactory;
 import com.stormpath.sdk.impl.http.ServletHttpRequest;
 import com.stormpath.sdk.impl.oauth.http.OauthHttpServletRequest;
 import com.stormpath.sdk.lang.Assert;
+import com.stormpath.sdk.lang.Classes;
 import com.stormpath.sdk.oauth.ScopeFactory;
 import org.apache.oltu.oauth2.as.request.OAuthTokenRequest;
 import org.apache.oltu.oauth2.common.OAuth;
@@ -37,6 +39,8 @@ import javax.servlet.http.HttpServletRequest;
 public class AccessTokenAuthenticationRequest extends OAuthTokenRequest implements AuthenticationRequest<String, String> {
 
     public static final long DEFAULT_TTL = 3600; //3600 seconds = 1 hour
+
+    public static final long DEFAULT_REFRESH_TOKEN_TTL = 3600 * 24 * 365; // Default TTL for refresh tokens is 1 year
 
     private final ScopeFactory scopeFactory;
 
@@ -63,6 +67,17 @@ public class AccessTokenAuthenticationRequest extends OAuthTokenRequest implemen
         }
         this.id = credentials[0];
         this.secret = credentials[1];
+        this.ttl = ttl;
+    }
+
+    public AccessTokenAuthenticationRequest(HttpServletRequest httpServletRequest, String id, String secret, ScopeFactory scopeFactory, long ttl) throws Exception {
+        super(httpServletRequest);
+        Assert.isTrue(ttl > 0, "ttl cannot be less or equal to 0 (zero).");
+
+        this.scopeFactory = scopeFactory;
+
+        this.id = id;
+        this.secret = secret;
         this.ttl = ttl;
     }
 

@@ -15,7 +15,7 @@
 */
 package com.stormpath.sdk.servlet.oauth;
 
-import com.stormpath.sdk.oauth.OauthGrantAuthenticationResult;
+import com.stormpath.sdk.api.ApiAuthenticationResult;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -24,5 +24,5 @@ import javax.servlet.http.HttpServletRequest;
  */
 public interface ServletOauthRefreshAuthenticator {
 
-    OauthGrantAuthenticationResult authenticate(HttpServletRequest httpServletRequest);
+    ApiAuthenticationResult authenticate(HttpServletRequest httpServletRequest);
 }
