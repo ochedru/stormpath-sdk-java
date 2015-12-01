@@ -15,16 +15,16 @@
 */
 package com.stormpath.sdk.servlet.oauth.impl;
 
+import com.stormpath.sdk.api.ApiAuthenticationResult;
 import com.stormpath.sdk.application.Application;
 import com.stormpath.sdk.application.Applications;
 import com.stormpath.sdk.lang.Assert;
-import com.stormpath.sdk.oauth.OauthGrantAuthenticationResult;
 import com.stormpath.sdk.servlet.oauth.ServletOauthRefreshAuthenticator;
 
 import javax.servlet.http.HttpServletRequest;
 
 /**
- * @since 1.0.RC6
+ * @since 1.0.RC8
  */
 public class DefaultServletOauthRefreshAuthenticator implements ServletOauthRefreshAuthenticator {
 
@@ -37,12 +37,12 @@ public class DefaultServletOauthRefreshAuthenticator implements ServletOauthRefr
     }
 
     @Override
-    public OauthGrantAuthenticationResult authenticate(HttpServletRequest httpRequest) {
+    public ApiAuthenticationResult authenticate(HttpServletRequest httpRequest) {
         Assert.notNull(httpRequest, "httpRequest argument cannot be null.");
         Assert.isInstanceOf(javax.servlet.http.HttpServletRequest.class, httpRequest,
                 "The specified httpRequest argument must be an instance of " + HTTP_SERVLET_REQUEST_FQCN);
 
         com.stormpath.sdk.impl.http.ServletHttpRequest stmpHttpRequest = new com.stormpath.sdk.impl.http.ServletHttpRequest(httpRequest);
-        return Applications.oauthRequestAuthenticator(application).authenticate(stmpHttpRequest);
+        return Applications.oauthRefreshGrantAuthenticator(application).authenticate(stmpHttpRequest);
     }
 }

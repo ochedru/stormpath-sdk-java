@@ -45,7 +45,7 @@ public interface ServletApiRequestAuthenticator {
      * //assume a request to, say, https://api.mycompany.com/foo:
      * public void onApiRequest(HttpServletRequest request, HttpServletResponse response) {
      *
-     *&ensp; &ensp; ApiAuthenticationResult result = Servlets.servletApiRequestAuthenticator(application).authenticate();
+     *    ApiAuthenticationResult result = Servlets.servletApiRequestAuthenticator(application).authenticate();
      *
      *    Account account = result.getAccount();
      *

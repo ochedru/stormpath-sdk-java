@@ -57,6 +57,8 @@ import com.stormpath.sdk.impl.authc.DefaultApiRequestAuthenticator;
 import com.stormpath.sdk.impl.ds.InternalDataStore;
 import com.stormpath.sdk.impl.idsite.DefaultIdSiteCallbackHandler;
 import com.stormpath.sdk.impl.idsite.DefaultIdSiteUrlBuilder;
+import com.stormpath.sdk.impl.jwt.JwtSignatureValidator;
+import com.stormpath.sdk.impl.jwt.JwtWrapper;
 import com.stormpath.sdk.impl.oauth.DefaultJwtAuthenticator;
 import com.stormpath.sdk.impl.oauth.DefaultPasswordGrantAuthenticator;
 import com.stormpath.sdk.impl.oauth.DefaultRefreshGrantAuthenticator;
@@ -793,4 +795,13 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
         return new DefaultJwtAuthenticator(this, getDataStore());
     }
 
+    /** @since 1.0.RC7 */
+    @Override
+    public void validateJwtSignature(String jwt) {
+
+        JwtSignatureValidator jwtSignatureValidator = new JwtSignatureValidator(getDataStore().getApiKey());
+
+        JwtWrapper jwtWrapper = new JwtWrapper(jwt);
+        jwtSignatureValidator.validate(jwtWrapper);
+    }
 }

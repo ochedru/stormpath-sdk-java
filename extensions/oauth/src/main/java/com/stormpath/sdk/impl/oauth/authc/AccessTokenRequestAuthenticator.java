@@ -55,7 +55,7 @@ public class AccessTokenRequestAuthenticator {
 
     public final static char SPACE_SEPARATOR = ' ';
 
-    private static final EnumSet<GrantType> SUPPORTED_GRANT_TYPES = EnumSet.of(GrantType.CLIENT_CREDENTIALS);
+    private static final EnumSet<GrantType> SUPPORTED_GRANT_TYPES = EnumSet.of(GrantType.CLIENT_CREDENTIALS, GrantType.REFRESH_TOKEN);
 
     // This implementation generates Access Tokens that are JWTs.  The JWT specification lists the following
     // default field names that should be used for JWTs making identity assertions:
@@ -127,6 +127,8 @@ public class AccessTokenRequestAuthenticator {
 
         responseBuilder.accessToken(accessToken).applicationHref(application.getHref());
 
+        responseBuilder.refreshToken(createRefreshToken(application, authResult, AccessTokenAuthenticationRequest.DEFAULT_REFRESH_TOKEN_TTL)).applicationHref(application.getHref());
+
         return new DefaultAccessTokenResult(dataStore, authResult.getApiKey(), grantedScopes, responseBuilder.build());
     }
 
@@ -172,6 +174,36 @@ public class AccessTokenRequestAuthenticator {
         } catch (OAuthSystemException e) {
             throw new IllegalStateException("Unexpected exception occurred while creating access token.");
         }
+    }
 
+    /**
+     * The result of this method is a that contains the following information:
+     * base64Header.base64Payload.base64Signature
+     *
+     * @since 1.0.RC7
+     */
+    private String createRefreshToken(Application application, ApiAuthenticationResult result, long ttl) {
+
+        //created is the UTC current time in seconds.
+        long createdAt = System.currentTimeMillis() / 1000;
+
+        Map<String, Object> jsonMap = new HashMap<String, Object>();
+
+        jsonMap.put(ACCESS_TOKEN_ISSUER_FIELD_NAME, application.getHref());
+        jsonMap.put(ACCESS_TOKEN_SUBJECT_FIELD_NAME, result.getApiKey().getId());
+        jsonMap.put(ACCESS_TOKEN_CREATION_TIMESTAMP_FIELD_NAME, createdAt);
+
+        //ttl is in seconds.  The expiration timestamp needs to be equal to: createdAt (in seconds) + ttl :
+        long expirationTimeAsSecondsSinceEpoch = createdAt + ttl;
+
+        jsonMap.put(ACCESS_TOKEN_EXPIRATION_TIMESTAMP_FIELD_NAME, expirationTimeAsSecondsSinceEpoch);
+
+        OAuthIssuer jwtIssuer = new JwtOauthIssuer(jwtSigner, jsonMap);
+
+        try {
+            return jwtIssuer.accessToken();
+        } catch (OAuthSystemException e) {
+            throw new IllegalStateException("Unexpected exception occurred while creating refresh token.");
+        }
     }
 }

@@ -1381,4 +1381,12 @@ public interface Application extends AccountStoreHolder<Application>, Resource, 
      * @since 1.0.RC7
      */
     OauthPolicy getOauthPolicy();
+
+    /**
+     * Validates the signature of a JWT that has been created for a given {@link Account Account}
+     * @param jwt the Json Web Token for which the signature will be validated.
+     *
+     * @since 1.0.RC7
+     */
+    void validateJwtSignature(String jwt);
 }
