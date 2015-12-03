@@ -35,10 +35,10 @@ public class DefaultAccessTokenResultFactory implements AccessTokenResultFactory
 
     private final AuthenticationJwtFactory authenticationJwtFactory;
     private final Application application;
-    private final long accountJwtTtl;
+    private final int accountJwtTtl;
 
     public DefaultAccessTokenResultFactory(Application application, AuthenticationJwtFactory authenticationJwtFactory,
-                                           long accountJwtTtl) {
+                                           int accountJwtTtl) {
         Assert.notNull(application, "Application argument cannot be null.");
         Assert.notNull(authenticationJwtFactory, "AuthenticationJwtFactory cannot be null.");
         this.application = application;
@@ -54,7 +54,7 @@ public class DefaultAccessTokenResultFactory implements AccessTokenResultFactory
         return authenticationJwtFactory;
     }
 
-    protected long getAccountJwtTtl() {
+    protected int getAccountJwtTtl() {
         return this.accountJwtTtl;
     }
 
@@ -70,7 +70,7 @@ public class DefaultAccessTokenResultFactory implements AccessTokenResultFactory
 
         Application application = getApplication();
 
-        long ttl = getAccountJwtTtl();
+        int ttl = getAccountJwtTtl();
 
         final TokenResponse tokenResponse =
             DefaultTokenResponse.tokenType(TokenType.BEARER).accessToken(jwt).applicationHref(application.getHref())

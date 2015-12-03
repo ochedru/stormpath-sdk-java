@@ -65,5 +65,6 @@ public interface OauthGrantAuthenticationResult extends Oauth2AuthenticationResu
      * The lifetime in seconds of the access token. For example, the value "3600" denotes that the access token will expire one hour after the response was generated.
      * @return lifetime in seconds of the access token. For example, the value "3600" denotes that the access token will expire one hour after the response was generated.
      */
-    long getExpiresIn();
+    int getExpiresIn();
+
 }
