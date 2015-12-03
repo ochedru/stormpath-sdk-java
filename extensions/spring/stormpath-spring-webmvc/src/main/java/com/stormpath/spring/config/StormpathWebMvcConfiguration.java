@@ -207,7 +207,7 @@ public class StormpathWebMvcConfiguration extends AbstractStormpathWebMvcConfigu
             }
 
             @Override
-            public long getAccountJwtTtl() {
+            public int getAccountJwtTtl() {
                 return accountJwtTtl;
             }
 

@@ -35,7 +35,7 @@ public class DefaultOauthGrantAuthenticationResultBuilder implements OauthGrantA
 
     private String tokenType;
 
-    private long expiresIn;
+    private int expiresIn;
 
     private Boolean isRefreshGrantAuthRequest = false;
 
@@ -70,7 +70,7 @@ public class DefaultOauthGrantAuthenticationResultBuilder implements OauthGrantA
         return tokenType;
     }
 
-    public long getExpiresIn() {
+    public int getExpiresIn() {
         return expiresIn;
     }
 
