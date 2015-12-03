@@ -13,19 +13,24 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package com.stormpath.sdk.oauth;
+package com.stormpath.sdk.impl.organization
+
+import com.stormpath.sdk.organization.Organizations
+import org.junit.Test
+
+import static org.testng.Assert.*
 
 /**
- * This class represents a JWT request which can be later validated either locally or against the Stormpath Server.
- *
  * @since 1.0.RC7
  */
-public interface JwtAuthenticationRequest extends Oauth2AuthenticationRequest {
+class DefaultOrganizationOptionsTest {
 
-    /**
-     * Returns the value corresponding to the String representation of the Json Web Token
-     *
-     * @return the String representation of the JWT
-     */
-    String getJwt();
+    @Test
+    void testDefault() {
+
+        def options = Organizations.options();
+
+        assertNotNull options
+        assertTrue options instanceof DefaultOrganizationOptions
+    }
 }

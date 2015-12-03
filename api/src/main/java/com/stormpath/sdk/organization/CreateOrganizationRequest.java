@@ -13,19 +13,19 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package com.stormpath.sdk.oauth;
+package com.stormpath.sdk.organization;
 
 /**
- * This class represents a JWT request which can be later validated either locally or against the Stormpath Server.
+ * Represents an attempt to create a new {@link com.stormpath.sdk.organization.Organization} record in Stormpath.
  *
  * @since 1.0.RC7
  */
-public interface JwtAuthenticationRequest extends Oauth2AuthenticationRequest {
+public interface CreateOrganizationRequest {
 
     /**
-     * Returns the value corresponding to the String representation of the Json Web Token
+     * Returns the {@link Organization Organization} instance for which a new record will be created in Stormpath.
      *
-     * @return the String representation of the JWT
+     * @return the {@link Organization Organization} instance for which a new record will be created in Stormpath.
      */
-    String getJwt();
+    Organization getOrganization();
 }

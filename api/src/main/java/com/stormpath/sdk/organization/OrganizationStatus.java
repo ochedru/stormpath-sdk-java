@@ -13,19 +13,20 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package com.stormpath.sdk.oauth;
+package com.stormpath.sdk.organization;
 
 /**
- * This class represents a JWT request which can be later validated either locally or against the Stormpath Server.
- *
  * @since 1.0.RC7
  */
-public interface JwtAuthenticationRequest extends Oauth2AuthenticationRequest {
+public enum OrganizationStatus {
 
     /**
-     * Returns the value corresponding to the String representation of the Json Web Token
-     *
-     * @return the String representation of the JWT
+     * Enabled organizations within a Tenant can be used as "Directory stores"
      */
-    String getJwt();
+    ENABLED,
+
+    /**
+     * Disabled organizations within a Tenant cannot be used as "Directory stores"
+     */
+    DISABLED,
 }

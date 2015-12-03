@@ -13,19 +13,14 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package com.stormpath.sdk.oauth;
+package com.stormpath.sdk.organization;
+
+import com.stormpath.sdk.resource.CollectionResource;
 
 /**
- * This class represents a JWT request which can be later validated either locally or against the Stormpath Server.
+ * A {@link CollectionResource} containing {@link com.stormpath.sdk.organization.OrganizationAccountStoreMapping} instances.
  *
  * @since 1.0.RC7
  */
-public interface JwtAuthenticationRequest extends Oauth2AuthenticationRequest {
-
-    /**
-     * Returns the value corresponding to the String representation of the Json Web Token
-     *
-     * @return the String representation of the JWT
-     */
-    String getJwt();
+public interface OrganizationAccountStoreMappingList extends CollectionResource<OrganizationAccountStoreMapping> {
 }
