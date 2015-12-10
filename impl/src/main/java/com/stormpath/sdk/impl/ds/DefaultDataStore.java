@@ -479,7 +479,7 @@ public class DefaultDataStore implements InternalDataStore {
 
             @Override
             public ResourceDataResult filter(ResourceDataRequest request) {
-                Request deleteRequest = new DefaultRequest(HttpMethod.DELETE, requestHref);
+                Request deleteRequest = new DefaultRequest(HttpMethod.DELETE, ensureFullyQualified(requestHref));
                 execute(deleteRequest);
                 //delete requests have HTTP 204 (no content), so just create an empty body for the result:
                 return new DefaultResourceDataResult(request.getAction(), request.getUri(), request.getResourceClass(), new HashMap<String, Object>());
