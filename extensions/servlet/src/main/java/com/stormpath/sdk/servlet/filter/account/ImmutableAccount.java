@@ -35,7 +35,10 @@ import com.stormpath.sdk.group.GroupMembershipList;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.oauth.AccessTokenList;
 import com.stormpath.sdk.oauth.RefreshTokenList;
+import com.stormpath.sdk.organization.OrganizationCriteria;
+import com.stormpath.sdk.organization.OrganizationList;
 import com.stormpath.sdk.provider.ProviderData;
+import com.stormpath.sdk.query.Criteria;
 import com.stormpath.sdk.tenant.Tenant;
 
 import java.util.Date;
@@ -261,6 +264,21 @@ public class ImmutableAccount implements Account {
     @Override
     public ApplicationList getApplications(ApplicationCriteria criteria) {
         return account.getApplications(criteria);
+    }
+    
+    @Override
+    public OrganizationList getOrganizations(){
+         return account.getOrganizations();
+    }
+    
+    @Override
+    public OrganizationList getOrganizations(Map<String, Object> queryParams){
+        return account.getOrganizations(queryParams);
+    }
+    
+    @Override
+    public OrganizationList getOrganizations(OrganizationCriteria criteria){
+        return account.getOrganizations(criteria);
     }
 
     @Override

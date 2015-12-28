@@ -26,6 +26,9 @@ import com.stormpath.sdk.api.ApiKeyOptions;
 import com.stormpath.sdk.application.Application;
 import com.stormpath.sdk.application.ApplicationCriteria;
 import com.stormpath.sdk.application.ApplicationList;
+import com.stormpath.sdk.organization.Organization;
+import com.stormpath.sdk.organization.OrganizationCriteria;
+import com.stormpath.sdk.organization.OrganizationList;
 import com.stormpath.sdk.directory.Directory;
 import com.stormpath.sdk.group.Group;
 import com.stormpath.sdk.group.GroupMembership;
@@ -89,6 +92,9 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     // @since 1.0.RC4
     static final CollectionReference<ApplicationList, Application> APPLICATIONS =
             new CollectionReference<ApplicationList, Application>("applications", ApplicationList.class, Application.class);
+    
+    static final CollectionReference<OrganizationList, Organization> ORGANIZATIONS =
+            new CollectionReference<OrganizationList, Organization>("organizations", OrganizationList.class, Organization.class);
 
     // @since 1.0.RC7
     static final CollectionReference<AccessTokenList, AccessToken> ACCESS_TOKENS =
@@ -417,6 +423,23 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     public ApplicationList getApplications(ApplicationCriteria criteria) {
         ApplicationList proxy = getApplications(); //just a proxy - does not execute a query until iteration occurs
         return getDataStore().getResource(proxy.getHref(), ApplicationList.class, (Criteria<ApplicationCriteria>) criteria);
+    }
+    
+    @Override
+    public OrganizationList getOrganizations(){
+         return getResourceProperty(ORGANIZATIONS);
+    }
+    
+    @Override
+    public OrganizationList getOrganizations(Map<String, Object> queryParams){
+        OrganizationList proxy = getOrganizations(); //just a proxy - does not execute a query until iteration occurs
+        return getDataStore().getResource(proxy.getHref(), OrganizationList.class, queryParams);
+    }
+    
+    @Override
+    public OrganizationList getOrganizations(OrganizationCriteria criteria){
+        OrganizationList proxy = getOrganizations(); //just a proxy - does not execute a query until iteration occurs
+        return getDataStore().getResource(proxy.getHref(), OrganizationList.class, (Criteria<OrganizationCriteria>) criteria);
     }
 
     /**
