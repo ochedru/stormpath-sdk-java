@@ -1,5 +1,24 @@
 ## Change Log ##
 
+### 1.0.RC8 ##
+
+Notes:
+
+- Please see the [1.0.RC8](https://github.com/stormpath/stormpath-sdk-java/issues?q=milestone%3A1.0.RC8+is%3Aclosed) issues list for more information
+
+### 1.0.RC7.7 ##
+
+Notes:
+
+- Please see the [1.0.RC7.7](https://github.com/stormpath/stormpath-sdk-java/issues?q=milestone%3A1.0.RC7.7+is%3Aclosed) issues list for more information
+
+### 1.0.RC7.6 ##
+
+Notes:
+
+- Please see the [1.0.RC7.6](https://github.com/stormpath/stormpath-sdk-java/issues?q=milestone%3A1.0.RC7.6+is%3Aclosed) issues list for more information
+- *Note*: 1.0.RC7.5 was not a viable release and was immediately replaced with 1.0.RC7.6
+
 ### 1.0.RC7.4 ##
 
 Notes:
