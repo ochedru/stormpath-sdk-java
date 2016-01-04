@@ -16,6 +16,8 @@
 package com.stormpath.sdk.organization;
 
 import com.stormpath.sdk.account.Account;
+import com.stormpath.sdk.account.AccountCriteria;
+import com.stormpath.sdk.account.AccountList;
 import com.stormpath.sdk.account.CreateAccountRequest;
 import com.stormpath.sdk.application.AccountStoreHolder;
 import com.stormpath.sdk.directory.AccountStore;
@@ -25,6 +27,8 @@ import com.stormpath.sdk.resource.Resource;
 import com.stormpath.sdk.resource.Saveable;
 import com.stormpath.sdk.resource.Deletable;
 import com.stormpath.sdk.directory.Directory;
+import com.stormpath.sdk.group.GroupCriteria;
+import com.stormpath.sdk.group.GroupList;
 import com.stormpath.sdk.resource.Auditable;
 import com.stormpath.sdk.resource.Extendable;
 import com.stormpath.sdk.resource.ResourceException;
@@ -421,4 +425,12 @@ public interface Organization extends AccountStoreHolder<Organization>, Resource
      *                           groups to be created.
      */
     Group createGroup(CreateGroupRequest request);
+    
+    GroupList getGroups();
+    GroupList getGroups(Map<String, Object> queryParams);
+    GroupList getGroups(GroupCriteria criteria);
+    
+    AccountList getAccounts();
+    AccountList getAccounts(Map<String, Object> queryParams);
+    AccountList getAccounts(AccountCriteria criteria);
 }

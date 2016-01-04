@@ -16,6 +16,8 @@
 package com.stormpath.sdk.impl.organization;
 
 import com.stormpath.sdk.account.Account;
+import com.stormpath.sdk.account.AccountCriteria;
+import com.stormpath.sdk.account.AccountList;
 import com.stormpath.sdk.account.Accounts;
 import com.stormpath.sdk.account.CreateAccountRequest;
 import com.stormpath.sdk.directory.AccountStore;
@@ -71,6 +73,10 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
             new CollectionReference<OrganizationAccountStoreMappingList, OrganizationAccountStoreMapping>("accountStoreMappings",
                     OrganizationAccountStoreMappingList.class,
                     OrganizationAccountStoreMapping.class);
+    static final CollectionReference<AccountList, Account>                         ACCOUNTS               =
+        new CollectionReference<AccountList, Account>("accounts", AccountList.class, Account.class);
+    static final CollectionReference<GroupList, Group>                             GROUPS                 =
+        new CollectionReference<GroupList, Group>("groups", GroupList.class, Group.class);
 
 
     private static final Map<String, Property> PROPERTY_DESCRIPTORS = createPropertyDescriptorMap(
@@ -382,5 +388,39 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
             }
         }
         return foundGroup;
+    }
+
+    @Override
+    public AccountList getAccounts() {
+        return getResourceProperty(ACCOUNTS);
+    }
+
+    @Override
+    public AccountList getAccounts(Map<String, Object> queryParams) {
+        AccountList list = getAccounts(); //safe to get the href: does not execute a query until iteration occurs
+        return getDataStore().getResource(list.getHref(), AccountList.class, queryParams);
+    }
+
+    @Override
+    public AccountList getAccounts(AccountCriteria criteria) {
+        AccountList list = getAccounts();  //safe to get the href: does not execute a query until iteration occurs
+        return getDataStore().getResource(list.getHref(), AccountList.class, (Criteria<AccountCriteria>) criteria);
+    }
+    
+    @Override
+    public GroupList getGroups() {
+        return getResourceProperty(GROUPS);
+    }
+
+    @Override
+    public GroupList getGroups(Map<String, Object> queryParams) {
+        GroupList list = getGroups(); //safe to get the href: does not execute a query until iteration occurs
+        return getDataStore().getResource(list.getHref(), GroupList.class, queryParams);
+    }
+
+    @Override
+    public GroupList getGroups(GroupCriteria criteria) {
+        GroupList groups = getGroups(); //safe to get the href: does not execute a query until iteration occurs
+        return getDataStore().getResource(groups.getHref(), GroupList.class, (Criteria<GroupCriteria>) criteria);
     }
 }
