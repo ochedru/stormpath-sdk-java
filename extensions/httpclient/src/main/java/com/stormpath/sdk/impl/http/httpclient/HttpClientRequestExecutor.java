@@ -279,7 +279,7 @@ public class HttpClientRequestExecutor implements RequestExecutor {
                     Header[] locationHeaders = httpResponse.getHeaders("Location");
                     String location = locationHeaders[0].getValue();
                     log.debug("Redirecting to: " + location);
-                    redirectUri = URI.create(location);
+                    redirectUri = request.getResourceUrl().resolve(location);
                     httpRequest.setURI(redirectUri);
                 } else {
 
