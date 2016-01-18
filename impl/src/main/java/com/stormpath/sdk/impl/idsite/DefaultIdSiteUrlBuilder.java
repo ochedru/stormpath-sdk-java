@@ -30,6 +30,7 @@ import java.util.Date;
 import java.util.UUID;
 
 import static com.stormpath.sdk.impl.idsite.IdSiteClaims.JWT_REQUEST;
+import java.lang.reflect.Method;
 
 /**
  * @since 1.0.RC
@@ -48,6 +49,15 @@ public class DefaultIdSiteUrlBuilder implements IdSiteUrlBuilder {
         Assert.notNull(internalDataStore, "internalDataStore cannot be null.");
         Assert.hasText(applicationHref, "applicationHref cannot be null or empty");
 
+        //qualify the application HREF
+        try{
+            Method ensureFullyQualifiedMethod = internalDataStore.getClass().getDeclaredMethod("ensureFullyQualified", String.class);
+            ensureFullyQualifiedMethod.setAccessible(true);
+            applicationHref = (String)ensureFullyQualifiedMethod.invoke(internalDataStore, applicationHref);
+            
+        } catch (Exception e){
+            
+        }
         this.ssoEndpoint = getBaseUrl(applicationHref) + "/sso";
         this.internalDataStore = internalDataStore;
         this.applicationHref = applicationHref;
