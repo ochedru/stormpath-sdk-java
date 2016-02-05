@@ -172,6 +172,8 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
         new CollectionReference<AccountList, Account>("accounts", AccountList.class, Account.class);
     static final CollectionReference<GroupList, Group>                             GROUPS                 =
         new CollectionReference<GroupList, Group>("groups", GroupList.class, Group.class);
+    static final CollectionReference<OrganizationList, Organization>  ORGANIZATIONS                 =
+        new CollectionReference<OrganizationList, Organization>("organizations", OrganizationList.class, Organization.class);
     static final CollectionReference<ApplicationAccountStoreMappingList, ApplicationAccountStoreMapping> ACCOUNT_STORE_MAPPINGS =
         new CollectionReference<ApplicationAccountStoreMappingList, ApplicationAccountStoreMapping>("accountStoreMappings",
                                                                               ApplicationAccountStoreMappingList.class,
@@ -274,7 +276,7 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
         GroupList groups = getGroups(); //safe to get the href: does not execute a query until iteration occurs
         return getDataStore().getResource(groups.getHref(), GroupList.class, (Criteria<GroupCriteria>) criteria);
     }
-
+    
     @Override
     public Tenant getTenant() {
         return getResourceProperty(TENANT);
@@ -855,6 +857,23 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
     /* @since 1.0.RC7 */
     public JwtAuthenticator createJwtAuthenticator() {
         return new DefaultJwtAuthenticator(this, getDataStore());
+    }
+
+    @Override
+    public OrganizationList getOrganizations() {
+        return getResourceProperty(ORGANIZATIONS);
+    }
+
+    @Override
+    public OrganizationList getOrganizations(Map<String, Object> queryParams) {
+        OrganizationList list = getOrganizations(); //safe to get the href: does not execute a query until iteration occurs
+        return getDataStore().getResource(list.getHref(), OrganizationList.class, queryParams);
+    }
+
+    @Override
+    public OrganizationList getOrganizationList(OrganizationCriteria criteria) {
+        OrganizationList list = getOrganizations(); //safe to get the href: does not execute a query until iteration occurs
+        return getDataStore().getResource(list.getHref(), OrganizationList.class, (Criteria<OrganizationCriteria>) criteria);
     }
 
 }

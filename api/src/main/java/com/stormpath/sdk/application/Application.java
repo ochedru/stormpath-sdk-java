@@ -51,6 +51,7 @@ import com.stormpath.sdk.saml.SamlPolicy;
 import com.stormpath.sdk.tenant.Tenant;
 import com.stormpath.sdk.organization.OrganizationCriteria;
 import com.stormpath.sdk.organization.Organization;
+import com.stormpath.sdk.organization.OrganizationList;
 
 import java.util.List;
 import java.util.Map;
@@ -1525,4 +1526,8 @@ public interface Application extends AccountStoreHolder<Application>, Resource, 
      * @since 1.0.RC8
      */
     Application addAuthorizedCallbackUri(String authorizedCallbackUri);
+    
+    OrganizationList getOrganizations();
+    OrganizationList getOrganizations(Map<String, Object> queryParams);
+    OrganizationList getOrganizationList(OrganizationCriteria criteria);
 }
