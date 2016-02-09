@@ -33,8 +33,8 @@ import com.stormpath.sdk.servlet.csrf.DisabledCsrfTokenManager;
 import com.stormpath.sdk.servlet.event.RequestEvent;
 import com.stormpath.sdk.servlet.event.RequestEventListener;
 import com.stormpath.sdk.servlet.event.RequestEventListenerAdapter;
-import com.stormpath.sdk.servlet.event.impl.Publisher;
 import com.stormpath.sdk.servlet.event.impl.RequestEventPublisher;
+import com.stormpath.sdk.servlet.event.impl.Publisher;
 import com.stormpath.sdk.servlet.filter.DefaultServerUriResolver;
 import com.stormpath.sdk.servlet.filter.DefaultUsernamePasswordRequestFactory;
 import com.stormpath.sdk.servlet.filter.DefaultWrappedServletRequestFactory;
@@ -62,7 +62,11 @@ import com.stormpath.sdk.servlet.filter.oauth.AccessTokenResultFactory;
 import com.stormpath.sdk.servlet.filter.oauth.DefaultAccessTokenAuthenticationRequestFactory;
 import com.stormpath.sdk.servlet.filter.oauth.DefaultAccessTokenRequestAuthorizer;
 import com.stormpath.sdk.servlet.filter.oauth.DefaultAccessTokenResultFactory;
+import com.stormpath.sdk.servlet.filter.oauth.DefaultRefreshTokenAuthenticationRequestFactory;
+import com.stormpath.sdk.servlet.filter.oauth.DefaultRefreshTokenResultFactory;
 import com.stormpath.sdk.servlet.filter.oauth.OriginAccessTokenRequestAuthorizer;
+import com.stormpath.sdk.servlet.filter.oauth.RefreshTokenAuthenticationRequestFactory;
+import com.stormpath.sdk.servlet.filter.oauth.RefreshTokenResultFactory;
 import com.stormpath.sdk.servlet.form.DefaultField;
 import com.stormpath.sdk.servlet.form.Field;
 import com.stormpath.sdk.servlet.http.Resolver;
@@ -88,10 +92,12 @@ import com.stormpath.sdk.servlet.mvc.IdSiteResultController;
 import com.stormpath.sdk.servlet.mvc.LoginController;
 import com.stormpath.sdk.servlet.mvc.LogoutController;
 import com.stormpath.sdk.servlet.mvc.RegisterController;
+import com.stormpath.sdk.servlet.mvc.SendVerificationEmailController;
 import com.stormpath.sdk.servlet.mvc.SamlController;
 import com.stormpath.sdk.servlet.mvc.SamlLogoutController;
 import com.stormpath.sdk.servlet.mvc.SamlResultController;
 import com.stormpath.sdk.servlet.mvc.VerifyController;
+import com.stormpath.sdk.servlet.oauth.AccessTokenValidationStrategy;
 import com.stormpath.sdk.servlet.organization.DefaultOrganizationNameKeyResolver;
 import com.stormpath.sdk.servlet.saml.DefaultSamlOrganizationResolver;
 import com.stormpath.sdk.servlet.saml.SamlOrganizationContext;
@@ -100,6 +106,7 @@ import com.stormpath.sdk.servlet.util.RemoteAddrResolver;
 import com.stormpath.sdk.servlet.util.SecureRequiredExceptForLocalhostResolver;
 import com.stormpath.sdk.servlet.util.SubdomainResolver;
 import com.stormpath.spring.context.CompositeMessageSource;
+import com.stormpath.sdk.servlet.event.TokenRevocationRequestEventListener;
 import com.stormpath.spring.mvc.SpringController;
 import com.stormpath.spring.mvc.TemplateLayoutInterceptor;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -324,6 +331,12 @@ public abstract class AbstractStormpathWebMvcConfiguration {
     @Value("#{ @environment['stormpath.web.verify.view'] ?: 'stormpath/verify' }")
     protected String verifyView;
 
+    @Value("#{ @environment['stormpath.web.sendVerificationEmail.uri'] ?: '/sendVerificationEmail' }")
+    protected String sendVerificationEmailUri;
+
+    @Value("#{ @environment['stormpath.web.sendVerificationEmail.view'] ?: 'stormpath/sendVerificationEmail' }")
+    protected String sendVerificationEmailView;
+
     // ================  Logout Controller properties  ===================
 
     @Value("#{ @environment['stormpath.web.logout.enabled'] ?: true }")
@@ -362,6 +375,9 @@ public abstract class AbstractStormpathWebMvcConfiguration {
 
     @Value("#{ @environment['stormpath.web.accessToken.origin.authorizer.originUris'] }")
     protected String accessTokenAuthorizedOriginUris;
+
+    @Value("#{ @environment['stormpath.web.accessToken.validationStrategy'] ?: 'stormpath'}")
+    protected String accessTokenValidationStrategy;
 
     // ================  ID Site properties  ===================
 
@@ -443,6 +459,7 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         }
         if (verifyEnabled) {
             mappings.put(verifyUri, stormpathVerifyController());
+            mappings.put(sendVerificationEmailUri, stormpathSendVerificationEmailController());
         }
         if (forgotEnabled) {
             mappings.put(forgotUri, stormpathForgotPasswordController());
@@ -633,7 +650,10 @@ public abstract class AbstractStormpathWebMvcConfiguration {
     }
 
     public Publisher<RequestEvent> stormpathRequestEventPublisher() {
-        return new RequestEventPublisher(stormpathRequestEventListener());
+        List<RequestEventListener> listeners = new ArrayList<RequestEventListener>();
+        listeners.add(stormpathRequestEventListener());
+        listeners.add(new TokenRevocationRequestEventListener()); //revoke access and refresh tokens after logout
+        return new RequestEventPublisher(listeners);
     }
 
     public String stormpathCsrfTokenSigningKey() {
@@ -659,7 +679,12 @@ public abstract class AbstractStormpathWebMvcConfiguration {
     }
 
     public AccessTokenResultFactory stormpathAccessTokenResultFactory() {
-        return new DefaultAccessTokenResultFactory(application, stormpathAuthenticationJwtFactory(), accountJwtTtl);
+        return new DefaultAccessTokenResultFactory(application);
+    }
+
+    /** @since 1.0.RC8.3 */
+    public RefreshTokenResultFactory stormpathRefreshTokenResultFactory() {
+        return new DefaultRefreshTokenResultFactory(application);
     }
 
     public WrappedServletRequestFactory stormpathWrappedServletRequestFactory() {
@@ -674,7 +699,7 @@ public abstract class AbstractStormpathWebMvcConfiguration {
     }
 
     public HttpAuthenticationScheme stormpathBearerAuthenticationScheme() {
-        return new BearerAuthenticationScheme(stormpathJwtSigningKeyResolver());
+        return new BearerAuthenticationScheme(stormpathJwtSigningKeyResolver(), AccessTokenValidationStrategy.fromName(accessTokenValidationStrategy));
     }
 
     public List<HttpAuthenticationScheme> stormpathHttpAuthenticationSchemes() {
@@ -785,6 +810,8 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         controller.setView(loginView);
         controller.setNextUri(loginNextUri);
         controller.setForgotLoginUri(forgotUri);
+        controller.setVerifyEnabled(verifyEnabled);
+        controller.setVerifyUri(verifyUri);
         controller.setRegisterUri(registerUri);
         controller.setLogoutUri(logoutUri);
         controller.setAuthenticationResultSaver(stormpathAuthenticationResultSaver());
@@ -1002,8 +1029,26 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         VerifyController controller = new VerifyController();
         controller.setNextUri(verifyNextUri);
         controller.setLogoutUri(logoutUri);
+        controller.setSendVerificationEmailUri(sendVerificationEmailUri);
         controller.setClient(client);
         controller.setEventPublisher(stormpathRequestEventPublisher());
+        controller.init();
+
+        return createSpringController(controller);
+    }
+
+    public Controller stormpathSendVerificationEmailController() {
+        if (idSiteEnabled) {
+            return createIdSiteController(null);
+        }
+
+        SendVerificationEmailController controller = new SendVerificationEmailController();
+        controller.setUri(sendVerificationEmailUri);
+        controller.setView(sendVerificationEmailView);
+        controller.setCsrfTokenManager(stormpathCsrfTokenManager());
+        controller.setAccountStoreResolver(stormpathAccountStoreResolver());
+        controller.setNextView(verifyView);
+        controller.setLoginUri(loginUri);
         controller.init();
 
         return createSpringController(controller);
@@ -1035,6 +1080,8 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         c.setEventPublisher(stormpathRequestEventPublisher());
         c.setAccessTokenAuthenticationRequestFactory(stormpathAccessTokenAuthenticationRequestFactory());
         c.setAccessTokenResultFactory(stormpathAccessTokenResultFactory());
+        c.setRefreshTokenAuthenticationRequestFactory(stormpathRefreshTokenAuthenticationRequestFactory());
+        c.setRefreshTokenResultFactory(stormpathRefreshTokenResultFactory());
         c.setAccountSaver(stormpathAuthenticationResultSaver());
         c.setRequestAuthorizer(stormpathAccessTokenRequestAuthorizer());
         c.init();
@@ -1070,7 +1117,12 @@ public abstract class AbstractStormpathWebMvcConfiguration {
     }
 
     public AccessTokenAuthenticationRequestFactory stormpathAccessTokenAuthenticationRequestFactory() {
-        return new DefaultAccessTokenAuthenticationRequestFactory(stormpathUsernamePasswordRequestFactory());
+        return new DefaultAccessTokenAuthenticationRequestFactory(stormpathAccountStoreResolver());
+    }
+
+    /** @since 1.0.RC8.3 */
+    public RefreshTokenAuthenticationRequestFactory stormpathRefreshTokenAuthenticationRequestFactory() {
+        return new DefaultRefreshTokenAuthenticationRequestFactory();
     }
 
     public RequestAuthorizer stormpathAccessTokenRequestAuthorizer() {

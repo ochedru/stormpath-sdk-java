@@ -57,6 +57,16 @@ public interface Config extends Map<String, String> {
 
     String getVerifyUrl();
 
+    /**
+     * @since 1.0.RC8.3
+     */
+    String getSendVerificationEmailUrl();
+
+    /**
+     * @since 1.0.RC8.3
+     */
+    boolean isVerifyEnabled();
+
     String getVerifyNextUrl();
 
     String getUnauthorizedUrl();
@@ -64,6 +74,8 @@ public interface Config extends Map<String, String> {
     CookieConfig getAccountCookieConfig();
 
     long getAccountJwtTtl();
+
+    String getAccessTokenValidationStrategy();
 
     <T> T getInstance(String classPropertyName) throws ServletException;
 

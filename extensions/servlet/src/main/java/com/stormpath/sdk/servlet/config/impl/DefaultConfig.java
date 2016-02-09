@@ -49,9 +49,13 @@ public class DefaultConfig implements Config {
     public static final String REGISTER_NEXT_URL = "stormpath.web.register.nextUri";
     public static final String VERIFY_URL = "stormpath.web.verify.uri";
     public static final String VERIFY_NEXT_URL = "stormpath.web.verify.nextUri";
+    public static final String SEND_VERIFICATION_EMAIL_URL = "stormpath.web.sendVerificationEmail.uri";
+    public static final String VERIFY_ENABLED = "stormpath.web.verify.enabled";
+
     public static final String UNAUTHORIZED_URL = "stormpath.web.unauthorized.uri";
 
     public static final String ACCESS_TOKEN_URL = "stormpath.web.accessToken.uri";
+    public static final String ACCESS_TOKEN_VALIDATION_STRATEGY = "stormpath.web.accessToken.validationStrategy";
     public static final String ACCOUNT_COOKIE_NAME = "stormpath.web.account.cookie.name";
     public static final String ACCOUNT_COOKIE_COMMENT = "stormpath.web.account.cookie.comment";
     public static final String ACCOUNT_COOKIE_DOMAIN = "stormpath.web.account.cookie.domain";
@@ -158,6 +162,16 @@ public class DefaultConfig implements Config {
     }
 
     @Override
+    public String getSendVerificationEmailUrl() {
+        return CFG.getString(SEND_VERIFICATION_EMAIL_URL);
+    }
+
+    @Override
+    public boolean isVerifyEnabled() {
+        return CFG.getBoolean(VERIFY_ENABLED);
+    }
+
+    @Override
     public String getAccessTokenUrl() {
         return CFG.getString(ACCESS_TOKEN_URL);
     }
@@ -175,6 +189,11 @@ public class DefaultConfig implements Config {
     @Override
     public long getAccountJwtTtl() {
         return _ACCOUNT_JWT_TTL;
+    }
+
+    @Override
+    public String getAccessTokenValidationStrategy() {
+        return CFG.getString(ACCESS_TOKEN_VALIDATION_STRATEGY);
     }
 
     @SuppressWarnings("unchecked")

@@ -44,6 +44,8 @@ public class LoginFilter extends ControllerFilter {
         controller.setForgotLoginUri(getConfig().getForgotPasswordUrl());
         controller.setRegisterUri(getConfig().getRegisterUrl());
         controller.setLogoutUri(getConfig().getLogoutUrl());
+        controller.setVerifyUri(getConfig().getVerifyUrl());
+        controller.setVerifyEnabled(getConfig().isVerifyEnabled());
         controller.setAuthenticationResultSaver(authenticationResultSaver);
         controller.setCsrfTokenManager(csrfTokenManager);
         controller.init();

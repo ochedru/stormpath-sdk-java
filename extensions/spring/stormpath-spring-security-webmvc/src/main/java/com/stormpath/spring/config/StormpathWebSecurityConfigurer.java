@@ -18,14 +18,13 @@ package com.stormpath.spring.config;
 import com.stormpath.sdk.authc.AuthenticationResult;
 import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.servlet.http.Saver;
+import com.stormpath.spring.oauth.Oauth2AuthenticationSpringSecurityProcessingFilter;
 import com.stormpath.spring.filter.SpringSecurityResolvedAccountFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.SecurityConfigurerAdapter;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -35,6 +34,7 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 
 /**
  * @since 1.0.RC5
@@ -42,6 +42,12 @@ import org.springframework.security.web.authentication.logout.LogoutHandler;
 @Configuration
 @EnableStormpathWebSecurity
 public class StormpathWebSecurityConfigurer extends SecurityConfigurerAdapter<DefaultSecurityFilterChain, HttpSecurity> {
+
+    @Autowired
+    Oauth2AuthenticationSpringSecurityProcessingFilter oauth2AuthenticationSpringSecurityProcessingFilter;
+
+    @Autowired
+    SpringSecurityResolvedAccountFilter springSecurityResolvedAccountFilter;
 
     @Autowired
     protected Client client;
@@ -53,6 +59,10 @@ public class StormpathWebSecurityConfigurer extends SecurityConfigurerAdapter<De
     @Autowired
     @Qualifier("stormpathAuthenticationSuccessHandler")
     protected AuthenticationSuccessHandler successHandler;
+
+    @Autowired
+    @Qualifier("stormpathCsrfTokenRepository")
+    private CsrfTokenRepository csrfTokenRepository;
 
     @Autowired
     @Qualifier("stormpathAuthenticationFailureHandler")
@@ -86,26 +96,43 @@ public class StormpathWebSecurityConfigurer extends SecurityConfigurerAdapter<De
     @Value("#{ @environment['stormpath.web.forgot.enabled'] ?: true }")
     protected boolean forgotEnabled;
 
-    @Value("#{ @environment['stormpath.web.forgot.nextUri'] ?: '/forgot' }")
+    @Value("#{ @environment['stormpath.web.forgot.uri'] ?: '/forgot' }")
     protected String forgotUri;
 
     @Value("#{ @environment['stormpath.web.change.enabled'] ?: true }")
     protected boolean changeEnabled;
 
-    @Value("#{ @environment['stormpath.web.change.nextUri'] ?: '/change' }")
+    @Value("#{ @environment['stormpath.web.change.uri'] ?: '/change' }")
     protected String changeUri;
 
     @Value("#{ @environment['stormpath.web.register.enabled'] ?: true }")
     protected boolean registerEnabled;
 
-    @Value("#{ @environment['stormpath.web.register.nextUri'] ?: '/register' }")
+    @Value("#{ @environment['stormpath.web.register.uri'] ?: '/register' }")
     protected String registerUri;
 
     @Value("#{ @environment['stormpath.web.verify.enabled'] ?: true }")
     protected boolean verifyEnabled;
 
-    @Value("#{ @environment['stormpath.web.verify.nextUri'] ?: '/verify' }")
+    @Value("#{ @environment['stormpath.web.verify.uri'] ?: '/verify' }")
     protected String verifyUri;
+
+    @Value("#{ @environment['stormpath.web.sendVerificationEmail.uri'] ?: '/sendVerificationEmail' }")
+    protected String sendVerificationEmailUri;
+    @Value("#{ @environment['stormpath.web.accessToken.enabled'] ?: true }")
+    protected boolean accessTokenEnabled;
+
+    @Value("#{ @environment['stormpath.web.accessToken.uri'] ?: '/oauth/token' }")
+    protected String accessTokenUri;
+
+    @Value("#{ @environment['stormpath.web.accessToken.revokeOnLogout'] ?: true }")
+    protected boolean accessTokenRevokeOnLogout;
+
+    @Value("#{ @environment['stormpath.web.csrf.token.enabled'] ?: true }")
+    protected boolean csrfTokenEnabled;
+
+    @Value("#{ @environment['stormpath.web.resendVerification.uri'] ?: '/resendVerification' }")
+    protected String resendVerificationUri;
 
     @Value("#{ @environment['stormpath.spring.security.fullyAuthenticated.enabled'] ?: true }")
     protected boolean fullyAuthenticatedEnabled;
@@ -161,16 +188,12 @@ public class StormpathWebSecurityConfigurer extends SecurityConfigurerAdapter<De
 
         // autowire this bean
         ApplicationContext context = http.getSharedObject(ApplicationContext.class);
-        AutowireCapableBeanFactory beanFactory = context.getAutowireCapableBeanFactory();
-        beanFactory.autowireBean(this);
+        context.getAutowireCapableBeanFactory().autowireBean(this);
 
         if (loginEnabled) {
             // We need to add the springSecurityResolvedAccountFilter whenever we have our login enabled in order to
             // fix https://github.com/stormpath/stormpath-sdk-java/issues/450
-            http.addFilterBefore(
-                new SpringSecurityResolvedAccountFilter(beanFactory.getBean(AuthenticationManager.class)),
-                AnonymousAuthenticationFilter.class
-            );
+            http.addFilterBefore(springSecurityResolvedAccountFilter, AnonymousAuthenticationFilter.class);
         }
 
         if ((idSiteEnabled || samlEnabled) && loginEnabled) {
@@ -228,12 +251,32 @@ public class StormpathWebSecurityConfigurer extends SecurityConfigurerAdapter<De
                 http.authorizeRequests().antMatchers(registerUri).permitAll();
             }
             if (verifyEnabled) {
-                http.authorizeRequests().antMatchers(verifyUri).permitAll();
+                http.authorizeRequests()
+                    .antMatchers(verifyUri).permitAll()
+                    .antMatchers(sendVerificationEmailUri).permitAll();
+            }
+            if (accessTokenEnabled) {
+                if (!samlEnabled && !idSiteEnabled && !loginEnabled) {
+                    oauth2AuthenticationSpringSecurityProcessingFilter.setStateless(true);
+                }
+                http.authorizeRequests().antMatchers(accessTokenUri).permitAll();
+                http.addFilterBefore(oauth2AuthenticationSpringSecurityProcessingFilter, AnonymousAuthenticationFilter.class);
+                http.authorizeRequests().antMatchers(accessTokenUri).permitAll();
             }
 
             if (fullyAuthenticatedEnabled) {
                 http.authorizeRequests().anyRequest().fullyAuthenticated();
             }
+
+            if (!csrfTokenEnabled) {
+                http.csrf().disable();
+            } else {
+                http.csrf().csrfTokenRepository(csrfTokenRepository);
+                if (accessTokenEnabled) {
+                    http.csrf().ignoringAntMatchers(accessTokenUri);
+                }
+            }
+
         }
     }
 
