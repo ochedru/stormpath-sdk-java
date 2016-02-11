@@ -31,11 +31,16 @@ import java.util.UUID;
 
 import static com.stormpath.sdk.impl.idsite.IdSiteClaims.JWT_REQUEST;
 import java.lang.reflect.Method;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @since 1.0.RC
  */
 public class DefaultIdSiteUrlBuilder implements IdSiteUrlBuilder {
+
+    // The base URL is the application URL with the last 3 segments rem
+    private static final Pattern HREF_PATTERN = Pattern.compile("^(.*)(?:\\/[\\w-]+){3}$");
 
     public static String SSO_LOGOUT_SUFFIX = "/logout";
     public final String ssoEndpoint;
@@ -50,13 +55,12 @@ public class DefaultIdSiteUrlBuilder implements IdSiteUrlBuilder {
         Assert.hasText(applicationHref, "applicationHref cannot be null or empty");
 
         //qualify the application HREF
-        try{
+        try {
             Method ensureFullyQualifiedMethod = internalDataStore.getClass().getDeclaredMethod("ensureFullyQualified", String.class);
             ensureFullyQualifiedMethod.setAccessible(true);
-            applicationHref = (String)ensureFullyQualifiedMethod.invoke(internalDataStore, applicationHref);
-            
-        } catch (Exception e){
-            
+            applicationHref = (String) ensureFullyQualifiedMethod.invoke(internalDataStore, applicationHref);
+        } catch (Exception e) {
+
         }
         this.ssoEndpoint = getBaseUrl(applicationHref) + "/sso";
         this.internalDataStore = internalDataStore;
@@ -148,32 +152,19 @@ public class DefaultIdSiteUrlBuilder implements IdSiteUrlBuilder {
     }
 
     /**
-     * Fix for https://github.com/stormpath/stormpath-sdk-java/issues/184.
-     * Base URL for IDSite is constructed from the applicationHref received in the constructor.
+     * Fix for https://github.com/stormpath/stormpath-sdk-java/issues/184. Base
+     * URL for IDSite is constructed from the applicationHref received in the
+     * constructor.
      *
      * @version 1.0.RC4.2
      */
     protected String getBaseUrl(String href) {
-
-        String baseUrl;
-        try {
-            final String DOUBLE_SLASH = "//";
-
-            int doubleSlashIndex = href.indexOf(DOUBLE_SLASH);
-            int singleSlashIndex = href.indexOf("/", doubleSlashIndex + DOUBLE_SLASH.length());
-            singleSlashIndex = singleSlashIndex != -1 ? singleSlashIndex : href.length();
-
-            baseUrl = href.substring(0, singleSlashIndex);
-
-        } catch (Exception e) {
-            throw new IllegalStateException("IDSite base URL could not be constructed.");
+        Matcher matcher = HREF_PATTERN.matcher(href);
+        if (matcher.matches()) {
+            return matcher.group(1);
         }
+        throw new IllegalStateException("IDSite base URL could not be constructed.");
 
-        if (!Strings.hasText(baseUrl)) {
-            throw new IllegalStateException("IDSite base URL could not be constructed.");
-        }
-
-        return baseUrl;
     }
 
 }
