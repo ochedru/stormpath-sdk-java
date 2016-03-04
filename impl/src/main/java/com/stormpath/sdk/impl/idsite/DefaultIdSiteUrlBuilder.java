@@ -156,7 +156,7 @@ public class DefaultIdSiteUrlBuilder implements IdSiteUrlBuilder {
      * URL for IDSite is constructed from the applicationHref received in the
      * constructor.
      *
-     * @version 1.0.RC4.2
+     * @since 1.0.RC4.2
      */
     protected String getBaseUrl(String href) {
         Matcher matcher = HREF_PATTERN.matcher(href);
