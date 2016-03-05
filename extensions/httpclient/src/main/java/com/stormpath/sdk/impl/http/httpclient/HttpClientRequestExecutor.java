@@ -39,18 +39,13 @@ import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
-import org.apache.http.HttpVersion;
 import org.apache.http.NoHttpResponseException;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.entity.GzipDecompressingEntity;
 import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.client.params.AllClientPNames;
-import org.apache.http.client.params.ClientPNames;
 import org.apache.http.conn.ConnectTimeoutException;
-import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.conn.PoolingClientConnectionManager;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +57,14 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.util.Random;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.config.SocketConfig;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 
 /**
  * {@code RequestExecutor} implementation that uses the
@@ -93,7 +96,7 @@ public class HttpClientRequestExecutor implements RequestExecutor {
 
     private final RequestAuthenticator requestAuthenticator;
 
-    private DefaultHttpClient httpClient;
+    private CloseableHttpClient httpClient;
 
     private BackoffStrategy backoffStrategy;
 
@@ -155,29 +158,35 @@ public class HttpClientRequestExecutor implements RequestExecutor {
             connectionMaxTotal = DEFAULT_MAX_CONNECTIONS_TOTAL;
         }
 
-        PoolingClientConnectionManager connMgr = new PoolingClientConnectionManager();
+        PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager();
         connMgr.setDefaultMaxPerRoute(connectionMaxPerRoute);
         connMgr.setMaxTotal(connectionMaxTotal);
+        connMgr.setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(connectionTimeout).build());
 
-        this.httpClient = new DefaultHttpClient(connMgr);
-        httpClient.getParams().setParameter(AllClientPNames.PROTOCOL_VERSION, HttpVersion.HTTP_1_1);
-        httpClient.getParams().setParameter(AllClientPNames.SO_TIMEOUT, connectionTimeout);
-        httpClient.getParams().setParameter(AllClientPNames.CONNECTION_TIMEOUT, connectionTimeout);
-        httpClient.getParams().setParameter(ClientPNames.HANDLE_REDIRECTS, false);
-        httpClient.getParams().setParameter("http.protocol.content-charset", "UTF-8");
+        HttpClientBuilder builder = HttpClients.custom()
+                .setConnectionManager(connMgr)
+                .setDefaultSocketConfig(
+                        SocketConfig.custom()
+                                .setSoTimeout(connectionTimeout).build())
+                .setDefaultRequestConfig(RequestConfig.custom().setConnectTimeout(connectionTimeout).build())
+                .disableRedirectHandling();
 
         if (proxy != null) {
             //We have some proxy setting to use!
             HttpHost httpProxyHost = new HttpHost(proxy.getHost(), proxy.getPort());
-            httpClient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, httpProxyHost);
+            builder.setProxy(httpProxyHost);
 
             if (proxy.isAuthenticationRequired()) {
-                httpClient.getCredentialsProvider().setCredentials(
+                CredentialsProvider credsProvider = new BasicCredentialsProvider();
+                credsProvider.setCredentials(
                         new AuthScope(proxy.getHost(), proxy.getPort()),
                         new UsernamePasswordCredentials(proxy.getUsername(), proxy.getPassword()));
+                builder.setDefaultCredentialsProvider(credsProvider);
             }
 
         }
+        
+        this.httpClient = builder.build();
     }
 
     public int getNumRetries() {
