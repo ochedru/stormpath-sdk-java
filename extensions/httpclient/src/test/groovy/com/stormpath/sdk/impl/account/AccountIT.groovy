@@ -470,7 +470,7 @@ class AccountIT extends ClientIT {
     }
 
     //@since 1.0.RC3
-    @Test
+    @Test(enabled = false)
     void testCustomData() {
         def app = createTempApp()
         def account = client.instantiate(Account)
