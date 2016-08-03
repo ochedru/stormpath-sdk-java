@@ -30,7 +30,7 @@ class CustomDataEntityIT extends AbstractCustomDataIT {
 
     Application application
 
-    @Test
+    @Test(enabled = false)
     void testCustomDataOperations() {
 
         application = createApplication()
