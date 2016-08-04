@@ -157,13 +157,13 @@ public class HttpClientRequestExecutor implements RequestExecutor {
 
         this.httpClientRequestFactory = new HttpClientRequestFactory();
 
-        PoolingClientConnectionManager connMgr = new PoolingClientConnectionManager();
+        int connectionMaxPerRoute, connectionMaxTotal;
         if (MAX_CONNECTIONS_TOTAL >= MAX_CONNECTIONS_PER_ROUTE) {
-            connMgr.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_ROUTE);
-            connMgr.setMaxTotal(MAX_CONNECTIONS_TOTAL);
+            connectionMaxPerRoute = MAX_CONNECTIONS_PER_ROUTE;
+            connectionMaxTotal = DEFAULT_MAX_CONNECTIONS_TOTAL;
         } else {
-            connMgr.setDefaultMaxPerRoute(DEFAULT_MAX_CONNECTIONS_PER_ROUTE);
-            connMgr.setMaxTotal(DEFAULT_MAX_CONNECTIONS_TOTAL);
+            connectionMaxPerRoute = DEFAULT_MAX_CONNECTIONS_PER_ROUTE;
+            connectionMaxTotal = DEFAULT_MAX_CONNECTIONS_TOTAL;
 
             log.warn(
                 "{} ({}) is less than {} ({}). " +
