@@ -29,15 +29,19 @@ import com.stormpath.sdk.idsite.IDSiteSessionTimeoutException
 import com.stormpath.sdk.idsite.IdSiteResultListener
 import com.stormpath.sdk.idsite.InvalidIDSiteTokenException
 import com.stormpath.sdk.idsite.LogoutResult
+import com.stormpath.sdk.idsite.NonceStore
 import com.stormpath.sdk.idsite.RegistrationResult
 import com.stormpath.sdk.impl.ds.DefaultDataStore
+import com.stormpath.sdk.impl.ds.InternalDataStore
+import com.stormpath.sdk.impl.ds.cache.CacheResolver
 import com.stormpath.sdk.impl.http.RequestExecutor
 import org.testng.annotations.Test
 
 import static com.stormpath.sdk.impl.idsite.IdSiteClaims.JWT_RESPONSE
 import static org.easymock.EasyMock.*
 import static org.testng.Assert.assertEquals
-import static IdSiteResultListenerType.*
+import static TestIdSiteResultListenerType.*
+import static org.testng.Assert.fail
 
 /**
  * @since 1.0.RC3
@@ -46,65 +50,65 @@ class DefaultIdSiteCallbackHandlerTest {
 
     @Test
     void testRegisteredListener() {
-        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1w" +
-                "YXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIi" +
-                "wiYXVkIjoiMkVWNzBBSFJUWUYwSk9BN09FRk8zU00yOSIsImV4cCI6MjUwMjQ2NjY1MDAwLCJpYXQiOjE0MDcxOTg1NTAsImp0aSI6" +
-                "IjQzNnZra0hnazF4MzA1N3BDUHFUYWgiLCJpcnQiOiIxZDAyZDMzNS1mYmZjLTRlYTgtYjgzNi04NWI5ZTJhNmYyYTAiLCJpc05ld1" +
-                "N1YiI6ZmFsc2UsInN0YXR1cyI6IlJFR0lTVEVSRUQifQ.4_yCiF6Cik2wep3iwyinTTcn5GHAEvCbIezO1aA5Kkk"
-        testListener(jwtResponse, IdSiteResultStatus.REGISTERED, IdSiteResultListenerType.SINGLE)
+        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjJFVjcwQUhSVFlGMEpPQTdPRUZPM1NNMjkifQ.eyJpc3" +
+                "MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1wYXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92" +
+                "MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIiwiZXhwIjoyNTAyNDY2NjUwMDAsImlhdCI6MTQwNzE5ODU1MCwianRpIj" +
+                "oiNDM2dmtrSGdrMXgzMDU3cENQcVRhaCIsImlydCI6IjFkMDJkMzM1LWZiZmMtNGVhOC1iODM2LTg1YjllMmE2ZjJhMCIsImlzTmV3" +
+                "U3ViIjpmYWxzZSwic3RhdHVzIjoiUkVHSVNURVJFRCJ9.0n-Sp5zDtiOIJ_Zq6IYdrDHoU3i95XPKhlH-2n9ALdg"
+        testListener(jwtResponse, IdSiteResultStatus.REGISTERED, SINGLE)
     }
 
     @Test
     void testAuthenticatedListener() {
-        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1w" +
-                "YXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIi" +
-                "wiYXVkIjoiMkVWNzBBSFJUWUYwSk9BN09FRk8zU00yOSIsImV4cCI6MjUwMjQ2NjY1MDAwLCJpYXQiOjE0MDcxOTg1NTAsImp0aSI6" +
-                "IjQzNnZra0hnazF4MzA1N3BDUHFUYWgiLCJpcnQiOiIxZDAyZDMzNS1mYmZjLTRlYTgtYjgzNi04NWI5ZTJhNmYyYTAiLCJpc05ld1" +
-                "N1YiI6ZmFsc2UsInN0YXR1cyI6IkFVVEhFTlRJQ0FURUQifQ.rpp0lsM1JDFeqkrOdwrtYOB1aitnLwhJuH3iaeuLIXY"
-        testListener(jwtResponse, IdSiteResultStatus.AUTHENTICATED, IdSiteResultListenerType.SINGLE)
+        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjJFVjcwQUhSVFlGMEpPQTdPRUZPM1NNMjkifQ.eyJpc3" +
+                "MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1wYXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92" +
+                "MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIiwiZXhwIjoyNTAyNDY2NjUwMDAsImlhdCI6MTQwNzE5ODU1MCwianRpIj" +
+                "oiNDM2dmtrSGdrMXgzMDU3cENQcVRhaCIsImlydCI6IjFkMDJkMzM1LWZiZmMtNGVhOC1iODM2LTg1YjllMmE2ZjJhMCIsImlzTmV3" +
+                "U3ViIjpmYWxzZSwic3RhdHVzIjoiQVVUSEVOVElDQVRFRCJ9.jR_T2G0obYuVIf-Gxer5pCieglfzwdWfNoMn505-hEw"
+        testListener(jwtResponse, IdSiteResultStatus.AUTHENTICATED, SINGLE)
     }
 
     @Test
     void testLogoutListener() {
-        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1w" +
-                "YXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIi" +
-                "wiYXVkIjoiMkVWNzBBSFJUWUYwSk9BN09FRk8zU00yOSIsImV4cCI6MjUwMjQ2NjY1MDAwLCJpYXQiOjE0MDcxOTg1NTAsImp0aSI6" +
-                "IjQzNnZra0hnazF4MzA1N3BDUHFUYWgiLCJpcnQiOiIxZDAyZDMzNS1mYmZjLTRlYTgtYjgzNi04NWI5ZTJhNmYyYTAiLCJpc05ld1" +
-                "N1YiI6ZmFsc2UsInN0YXR1cyI6IkxPR09VVCJ9.T6ClI4znHCElk1gMQoBpVvE9Jc5Vf4BEjrQ0IWvKYIc"
-        testListener(jwtResponse, IdSiteResultStatus.LOGOUT, IdSiteResultListenerType.SINGLE)
+        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjJFVjcwQUhSVFlGMEpPQTdPRUZPM1NNMjkifQ.eyJpc3" +
+                "MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1wYXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92" +
+                "MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIiwiZXhwIjoyNTAyNDY2NjUwMDAsImlhdCI6MTQwNzE5ODU1MCwianRpIj" +
+                "oiNDM2dmtrSGdrMXgzMDU3cENQcVRhaCIsImlydCI6IjFkMDJkMzM1LWZiZmMtNGVhOC1iODM2LTg1YjllMmE2ZjJhMCIsImlzTmV3" +
+                "U3ViIjpmYWxzZSwic3RhdHVzIjoiTE9HT1VUIn0.eQJAg2ils97GdtokcaK4T98CwfizM7ZCmuTqew9gf2Y"
+        testListener(jwtResponse, IdSiteResultStatus.LOGOUT, SINGLE)
     }
 
     /* @since 1.0.RC7.3 */
     @Test
     void testRegisteredListenerMulti() {
-        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1w" +
-                "YXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIi" +
-                "wiYXVkIjoiMkVWNzBBSFJUWUYwSk9BN09FRk8zU00yOSIsImV4cCI6MjUwMjQ2NjY1MDAwLCJpYXQiOjE0MDcxOTg1NTAsImp0aSI6" +
-                "IjQzNnZra0hnazF4MzA1N3BDUHFUYWgiLCJpcnQiOiIxZDAyZDMzNS1mYmZjLTRlYTgtYjgzNi04NWI5ZTJhNmYyYTAiLCJpc05ld1" +
-                "N1YiI6ZmFsc2UsInN0YXR1cyI6IlJFR0lTVEVSRUQifQ.4_yCiF6Cik2wep3iwyinTTcn5GHAEvCbIezO1aA5Kkk"
-        testListener(jwtResponse, IdSiteResultStatus.REGISTERED, IdSiteResultListenerType.MULTI)
+        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjJFVjcwQUhSVFlGMEpPQTdPRUZPM1NNMjkifQ.eyJpc3" +
+                "MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1wYXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92" +
+                "MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIiwiZXhwIjoyNTAyNDY2NjUwMDAsImlhdCI6MTQwNzE5ODU1MCwianRpIj" +
+                "oiNDM2dmtrSGdrMXgzMDU3cENQcVRhaCIsImlydCI6IjFkMDJkMzM1LWZiZmMtNGVhOC1iODM2LTg1YjllMmE2ZjJhMCIsImlzTmV3" +
+                "U3ViIjpmYWxzZSwic3RhdHVzIjoiUkVHSVNURVJFRCJ9.0n-Sp5zDtiOIJ_Zq6IYdrDHoU3i95XPKhlH-2n9ALdg"
+        testListener(jwtResponse, IdSiteResultStatus.REGISTERED, MULTI)
     }
 
     /* @since 1.0.RC7.3 */
     @Test
     void testAuthenticatedListenerMulti() {
-        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1w" +
-                "YXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIi" +
-                "wiYXVkIjoiMkVWNzBBSFJUWUYwSk9BN09FRk8zU00yOSIsImV4cCI6MjUwMjQ2NjY1MDAwLCJpYXQiOjE0MDcxOTg1NTAsImp0aSI6" +
-                "IjQzNnZra0hnazF4MzA1N3BDUHFUYWgiLCJpcnQiOiIxZDAyZDMzNS1mYmZjLTRlYTgtYjgzNi04NWI5ZTJhNmYyYTAiLCJpc05ld1" +
-                "N1YiI6ZmFsc2UsInN0YXR1cyI6IkFVVEhFTlRJQ0FURUQifQ.rpp0lsM1JDFeqkrOdwrtYOB1aitnLwhJuH3iaeuLIXY"
-        testListener(jwtResponse, IdSiteResultStatus.AUTHENTICATED, IdSiteResultListenerType.MULTI)
+        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjJFVjcwQUhSVFlGMEpPQTdPRUZPM1NNMjkifQ.eyJpc3" +
+                "MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1wYXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92" +
+                "MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIiwiZXhwIjoyNTAyNDY2NjUwMDAsImlhdCI6MTQwNzE5ODU1MCwianRpIj" +
+                "oiNDM2dmtrSGdrMXgzMDU3cENQcVRhaCIsImlydCI6IjFkMDJkMzM1LWZiZmMtNGVhOC1iODM2LTg1YjllMmE2ZjJhMCIsImlzTmV3" +
+                "U3ViIjpmYWxzZSwic3RhdHVzIjoiQVVUSEVOVElDQVRFRCJ9.jR_T2G0obYuVIf-Gxer5pCieglfzwdWfNoMn505-hEw"
+        testListener(jwtResponse, IdSiteResultStatus.AUTHENTICATED, MULTI)
     }
 
     /* @since 1.0.RC7.3 */
     @Test
     void testLogoutListenerMulti() {
-        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1w" +
-                "YXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIi" +
-                "wiYXVkIjoiMkVWNzBBSFJUWUYwSk9BN09FRk8zU00yOSIsImV4cCI6MjUwMjQ2NjY1MDAwLCJpYXQiOjE0MDcxOTg1NTAsImp0aSI6" +
-                "IjQzNnZra0hnazF4MzA1N3BDUHFUYWgiLCJpcnQiOiIxZDAyZDMzNS1mYmZjLTRlYTgtYjgzNi04NWI5ZTJhNmYyYTAiLCJpc05ld1" +
-                "N1YiI6ZmFsc2UsInN0YXR1cyI6IkxPR09VVCJ9.T6ClI4znHCElk1gMQoBpVvE9Jc5Vf4BEjrQ0IWvKYIc"
-        testListener(jwtResponse, IdSiteResultStatus.LOGOUT, IdSiteResultListenerType.MULTI)
+        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjJFVjcwQUhSVFlGMEpPQTdPRUZPM1NNMjkifQ.eyJpc3" +
+                "MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1wYXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92" +
+                "MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIiwiZXhwIjoyNTAyNDY2NjUwMDAsImlhdCI6MTQwNzE5ODU1MCwianRpIj" +
+                "oiNDM2dmtrSGdrMXgzMDU3cENQcVRhaCIsImlydCI6IjFkMDJkMzM1LWZiZmMtNGVhOC1iODM2LTg1YjllMmE2ZjJhMCIsImlzTmV3" +
+                "U3ViIjpmYWxzZSwic3RhdHVzIjoiTE9HT1VUIn0.eQJAg2ils97GdtokcaK4T98CwfizM7ZCmuTqew9gf2Y"
+        testListener(jwtResponse, IdSiteResultStatus.LOGOUT, MULTI)
     }
 
     /* @since 1.0.RC5 */
@@ -166,25 +170,103 @@ class DefaultIdSiteCallbackHandlerTest {
 
     @Test
     public void testNoIdSiteResultListenerSet() {
-        testNoListener(IdSiteResultListenerType.NONE)
+        testNoListener(NONE)
     }
 
     @Test
     public void testNullIdSiteResultListenerSet() {
-        testNoListener(IdSiteResultListenerType.SET)
+        testNoListener(SET)
     }
 
     @Test
     public void testNullIdSiteResultListenerAdd() {
-        testNoListener(IdSiteResultListenerType.ADD)
+        testNoListener(ADD)
     }
 
-    private void testNoListener(IdSiteResultListenerType idSiteResultListenerType) {
+    /**
+     * @since 1.0.RC9
+     */
+    @Test
+    public void testSetNonceStore() {
+        def dataStore = createStrictMock(InternalDataStore)
+        def application = createStrictMock(Application)
+        def request = createStrictMock(HttpRequest)
+        def cacheResolver = createStrictMock(CacheResolver)
+
         String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1w" +
-                "YXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIi" +
-                "wiYXVkIjoiMkVWNzBBSFJUWUYwSk9BN09FRk8zU00yOSIsImV4cCI6MjUwMjQ2NjY1MDAwLCJpYXQiOjE0MDcxOTg1NTAsImp0aSI6" +
-                "IjQzNnZra0hnazF4MzA1N3BDUHFUYWgiLCJpcnQiOiIxZDAyZDMzNS1mYmZjLTRlYTgtYjgzNi04NWI5ZTJhNmYyYTAiLCJpc05ld1" +
-                "N1YiI6ZmFsc2UsInN0YXR1cyI6IlJFR0lTVEVSRUQifQ.4_yCiF6Cik2wep3iwyinTTcn5GHAEvCbIezO1aA5Kkk"
+            "YXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIi" +
+            "wiYXVkIjoiMkVWNzBBSFJUWUYwSk9BN09FRk8zU00yOSIsImV4cCI6MjUwMjQ2NjY1MDAwLCJpYXQiOjE0MDcxOTg1NTAsImp0aSI6" +
+            "IjQzNnZra0hnazF4MzA1N3BDUHFUYWgiLCJpcnQiOiIxZDAyZDMzNS1mYmZjLTRlYTgtYjgzNi04NWI5ZTJhNmYyYTAiLCJpc05ld1" +
+            "N1YiI6ZmFsc2UsInN0YXR1cyI6IlJFR0lTVEVSRUQifQ.4_yCiF6Cik2wep3iwyinTTcn5GHAEvCbIezO1aA5Kkk"
+
+        expect(request.getMethod()).andReturn(HttpMethod.GET)
+        expect(request.getParameter(JWT_RESPONSE)).andReturn(jwtResponse)
+        expect(dataStore.getCacheResolver()).andReturn(cacheResolver)
+
+        replay dataStore, application, request, cacheResolver
+
+        def idSiteCallbackHandler = new DefaultIdSiteCallbackHandler(dataStore, application, request)
+
+        def nonceStore = createMock(NonceStore)
+
+        idSiteCallbackHandler.setNonceStore(nonceStore)
+        assertEquals idSiteCallbackHandler.nonceStore, nonceStore
+
+        try {
+            idSiteCallbackHandler.setNonceStore(null)
+        } catch (IllegalArgumentException e) {
+            assertEquals e.getMessage(), "[Assertion failed] - this argument is required; it must not be null"
+        }
+    }
+
+    /**
+     * @since 1.0.RC9
+     */
+    @Test
+    public void testGetAccountResultNullHref() {
+        def apiKey = ApiKeys.builder()
+            .setId('2EV70AHRTYF0JOA7OEFO3SM29')
+            .setSecret('goPUHQMkS4dlKwl5wtbNd91I+UrRehCsEDJrIrMruK8')
+            .build()
+        def requestExecutor = createStrictMock(RequestExecutor)
+        def dataStore = new DefaultDataStore(requestExecutor, apiKey)
+        def application = createStrictMock(Application)
+        def request = createStrictMock(HttpRequest)
+        def cacheResolver = createStrictMock(CacheResolver)
+
+        // empty subj claim
+        // status claim is REGISTERED
+        // this is an invalid state
+        def jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9." +
+            "eyJpc3MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1wYXRoLmlvIiwiaWF0IjoxNDU5MTI0NDQ2LCJleHAiOjE0OTA2Nj" +
+            "AxNzUsImF1ZCI6IjJFVjcwQUhSVFlGMEpPQTdPRUZPM1NNMjkiLCJzdWIiOiIiLCJqdGkiOiI0MzZ2a2tIZ2sxeDMwNTdwQ1BxVGFo" +
+            "IiwiaXJ0IjoiMWQwMmQzMzUtZmJmYy00ZWE4LWI4MzYtODViOWUyYTZmMmEwIiwiaXNOZXdTdWIiOiJmYWxzZSIsInN0YXR1cyI6Il" +
+            "JFR0lTVEVSRUQifQ." +
+            "cixfevZzese4V3mUk8K147b2reOJzMlmYIhJev8YbGs"
+
+        expect(request.getMethod()).andReturn(HttpMethod.GET)
+        expect(request.getParameter(JWT_RESPONSE)).andReturn(jwtResponse)
+
+        replay requestExecutor, application, request, cacheResolver
+
+        def idSiteCallbackHandler = new DefaultIdSiteCallbackHandler(dataStore, application, request)
+
+        try {
+            idSiteCallbackHandler.getAccountResult()
+            fail "should not be here"
+        } catch (InvalidJwtException e) {
+            assertEquals e.getMessage(), InvalidJwtException.JWT_RESPONSE_MISSING_PARAMETER_ERROR
+        }
+
+        verify requestExecutor, application, request, cacheResolver
+    }
+
+    private void testNoListener(TestIdSiteResultListenerType idSiteResultListenerType) {
+        String jwtResponse = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjJFVjcwQUhSVFlGMEpPQTdPRUZPM1NNMjkifQ.eyJpc3" +
+                "MiOiJodHRwczovL3N0dXJkeS1zaGllbGQuaWQuc3Rvcm1wYXRoLmlvIiwic3ViIjoiaHR0cHM6Ly9hcGkuc3Rvcm1wYXRoLmNvbS92" +
+                "MS9hY2NvdW50cy83T3JhOEtmVkRFSVFQMzhLenJZZEFzIiwiZXhwIjoyNTAyNDY2NjUwMDAsImlhdCI6MTQwNzE5ODU1MCwianRpIj" +
+                "oiNDM2dmtrSGdrMXgzMDU3cENQcVRhaCIsImlydCI6IjFkMDJkMzM1LWZiZmMtNGVhOC1iODM2LTg1YjllMmE2ZjJhMCIsImlzTmV3" +
+                "U3ViIjpmYWxzZSwic3RhdHVzIjoiUkVHSVNURVJFRCJ9.0n-Sp5zDtiOIJ_Zq6IYdrDHoU3i95XPKhlH-2n9ALdg"
 
         def apiKey = ApiKeys.builder().setId('2EV70AHRTYF0JOA7OEFO3SM29').setSecret('goPUHQMkS4dlKwl5wtbNd91I+UrRehCsEDJrIrMruK8').build()
         def requestExecutor = createStrictMock(RequestExecutor)
@@ -200,7 +282,7 @@ class DefaultIdSiteCallbackHandlerTest {
 
         DefaultIdSiteCallbackHandler callbackHandler = new DefaultIdSiteCallbackHandler(dataStore, application, request)
 
-        switch(idSiteResultListenerType) {
+        switch(TestIdSiteResultListenerType) {
             case SET:     callbackHandler.setResultListener(null)
                           break
 
@@ -218,7 +300,7 @@ class DefaultIdSiteCallbackHandlerTest {
     }
 
     private void testListener(
-        String jwtResponse, IdSiteResultStatus expectedListenerMethod, IdSiteResultListenerType idSiteResultListenerType
+            String jwtResponse, IdSiteResultStatus expectedListenerMethod, TestIdSiteResultListenerType TestIdSiteResultListenerType
     ) {
         def apiKey = ApiKeys.builder().setId('2EV70AHRTYF0JOA7OEFO3SM29').setSecret('goPUHQMkS4dlKwl5wtbNd91I+UrRehCsEDJrIrMruK8').build()
         def requestExecutor = createStrictMock(RequestExecutor)
@@ -252,7 +334,7 @@ class DefaultIdSiteCallbackHandlerTest {
                 }
             }
             expect(listener.onRegistered(anyObject(AccountResult))).andDelegateTo(listenerDelegate)
-            if (idSiteResultListenerType == IdSiteResultListenerType.MULTI) {
+            if (TestIdSiteResultListenerType == MULTI) {
                 expect(listener2.onRegistered(anyObject(AccountResult))).andDelegateTo(listenerDelegate)
             }
         } else if (expectedListenerMethod.equals(IdSiteResultStatus.AUTHENTICATED)) {
@@ -271,7 +353,7 @@ class DefaultIdSiteCallbackHandlerTest {
                 }
             }
             expect(listener.onAuthenticated(anyObject(AccountResult))).andDelegateTo(listenerDelegate)
-            if (idSiteResultListenerType == IdSiteResultListenerType.MULTI) {
+            if (TestIdSiteResultListenerType == MULTI) {
                 expect(listener2.onAuthenticated(anyObject(AccountResult))).andDelegateTo(listenerDelegate)
             }
         } else if (expectedListenerMethod.equals(IdSiteResultStatus.LOGOUT)) {
@@ -290,7 +372,7 @@ class DefaultIdSiteCallbackHandlerTest {
                 }
             }
             expect(listener.onLogout(anyObject(AccountResult))).andDelegateTo(listenerDelegate)
-            if (idSiteResultListenerType == IdSiteResultListenerType.MULTI) {
+            if (TestIdSiteResultListenerType == MULTI) {
                 expect(listener2.onLogout(anyObject(AccountResult))).andDelegateTo(listenerDelegate)
             }
         }
@@ -299,7 +381,7 @@ class DefaultIdSiteCallbackHandlerTest {
 
         DefaultIdSiteCallbackHandler callbackHandler = new DefaultIdSiteCallbackHandler(dataStore, application, request)
         callbackHandler.setResultListener(listener)
-        if (idSiteResultListenerType == IdSiteResultListenerType.MULTI) {
+        if (TestIdSiteResultListenerType == MULTI) {
             callbackHandler.addResultListener(listener2)
         }
 

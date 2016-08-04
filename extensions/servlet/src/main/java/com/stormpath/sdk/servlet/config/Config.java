@@ -15,7 +15,35 @@
  */
 package com.stormpath.sdk.servlet.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.stormpath.sdk.application.Application;
+import com.stormpath.sdk.authc.AuthenticationResult;
+import com.stormpath.sdk.client.Client;
+import com.stormpath.sdk.lang.BiPredicate;
+import com.stormpath.sdk.servlet.account.AccountResolver;
+import com.stormpath.sdk.servlet.application.ApplicationResolver;
+import com.stormpath.sdk.servlet.csrf.CsrfTokenManager;
+import com.stormpath.sdk.servlet.event.RequestEvent;
+import com.stormpath.sdk.servlet.event.impl.Publisher;
+import com.stormpath.sdk.servlet.filter.ChangePasswordConfig;
+import com.stormpath.sdk.servlet.filter.ContentNegotiationResolver;
+import com.stormpath.sdk.servlet.filter.ControllerConfig;
+import com.stormpath.sdk.servlet.filter.FilterChainManager;
+import com.stormpath.sdk.servlet.filter.FilterChainResolver;
+import com.stormpath.sdk.servlet.filter.ServerUriResolver;
+import com.stormpath.sdk.servlet.http.MediaType;
+import com.stormpath.sdk.servlet.http.Resolver;
+import com.stormpath.sdk.servlet.http.Saver;
+import com.stormpath.sdk.servlet.http.authc.AccountStoreResolver;
+import com.stormpath.sdk.servlet.i18n.MessageContext;
+import com.stormpath.sdk.servlet.i18n.MessageSource;
+import com.stormpath.sdk.servlet.idsite.IdSiteOrganizationContext;
+import com.stormpath.sdk.servlet.mvc.RequestFieldValueResolver;
+import com.stormpath.sdk.servlet.mvc.WebHandler;
+
 import javax.servlet.ServletException;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -23,26 +51,45 @@ import java.util.Map;
  */
 public interface Config extends Map<String, String> {
 
-    /**
-     * Returns the context-relative URL of the login view.
-     *
-     * @return the context-relative URL of the login view.
-     */
-    String getLoginUrl();
+    ObjectMapper getObjectMapper();
 
-    String getLoginNextUrl();
+    Client getClient();
 
-    String getLogoutUrl();
+    ApplicationResolver getApplicationResolver();
 
-    String getForgotPasswordUrl();
+    MessageContext getMessageContext();
 
-    String getForgotPasswordNextUrl();
+    Resolver<Locale> getLocaleResolver();
 
-    String getChangePasswordUrl();
+    CsrfTokenManager getCsrfTokenManager();
 
-    String getChangePasswordNextUrl();
+    RequestFieldValueResolver getFieldValueResolver();
 
-    String getLogoutNextUrl();
+    MessageSource getMessageSource();
+
+    ControllerConfig getLoginConfig();
+
+    ControllerConfig getLogoutConfig();
+
+    ControllerConfig getRegisterConfig();
+
+    ControllerConfig getForgotPasswordConfig();
+
+    ControllerConfig getVerifyConfig();
+
+    ChangePasswordConfig getChangePasswordConfig();
+
+    Saver<AuthenticationResult> getAuthenticationResultSaver();
+
+    AccountResolver getAccountResolver();
+
+    AccountStoreResolver getAccountStoreResolver();
+
+    ContentNegotiationResolver getContentNegotiationResolver();
+
+    Publisher<RequestEvent> getRequestEventPublisher();
+
+    boolean isRegisterAutoLoginEnabled();
 
     /**
      * @since 1.0.RC6
@@ -51,33 +98,77 @@ public interface Config extends Map<String, String> {
 
     String getAccessTokenUrl();
 
-    String getRegisterUrl();
-
-    String getRegisterNextUrl();
-
-    String getVerifyUrl();
-
-    /**
-     * @since 1.0.RC8.3
-     */
-    String getSendVerificationEmailUrl();
-
-    /**
-     * @since 1.0.RC8.3
-     */
-    boolean isVerifyEnabled();
-
-    String getVerifyNextUrl();
-
     String getUnauthorizedUrl();
 
-    CookieConfig getAccountCookieConfig();
+    boolean isMeEnabled();
 
-    long getAccountJwtTtl();
+    String getMeUrl();
+
+    List<String> getMeExpandedProperties();
+
+    CookieConfig getRefreshTokenCookieConfig();
+
+    CookieConfig getAccessTokenCookieConfig();
 
     String getAccessTokenValidationStrategy();
 
+    WebHandler getLoginPreHandler();
+
+    WebHandler getLoginPostHandler();
+
+    WebHandler getRegisterPreHandler();
+
+    WebHandler getRegisterPostHandler();
+
+    BiPredicate<Boolean,Application> getRegisterEnabledPredicate();
+
+    Resolver<Boolean> getRegisterEnabledResolver();
+
+    FilterChainManager getFilterChainManager();
+
+    FilterChainResolver getFilterChainResolver();
+
     <T> T getInstance(String classPropertyName) throws ServletException;
 
-    <T> Map<String,T> getInstances(String propertyNamePrefix, Class<T> expectedType) throws ServletException;
+    <T> Map<String, T> getInstances(String propertyNamePrefix, Class<T> expectedType) throws ServletException;
+
+    /**
+     * @since 1.0.0
+     */
+    String getProducesMediaTypes();
+
+    /**
+     * @since 1.0.0
+     */
+    List<MediaType> getProducedMediaTypes();
+
+    /**
+     * @since 1.0.0
+     */
+    boolean isOAuthEnabled();
+
+    /**
+     * @since 1.0.0
+     */
+    boolean isIdSiteEnabled();
+
+    /**
+     * @since 1.0.0
+     */
+    boolean isCallbackEnabled();
+
+    /**
+     * @since 1.0.0
+     */
+    String getCallbackUri();
+
+    /**
+     * @since 1.0.0
+     */
+    String getWebApplicationDomain();
+
+    ServerUriResolver getServerUriResolver();
+
+    Resolver<IdSiteOrganizationContext> getIdSiteOrganizationResolver();
+
 }

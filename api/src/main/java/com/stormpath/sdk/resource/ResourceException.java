@@ -17,6 +17,7 @@ package com.stormpath.sdk.resource;
 
 import com.stormpath.sdk.error.Error;
 import com.stormpath.sdk.lang.Assert;
+import com.stormpath.sdk.lang.Strings;
 
 /**
  * @since 0.2
@@ -42,9 +43,15 @@ public class ResourceException extends RuntimeException implements Error {
         StringBuilder sb = new StringBuilder();
         sb.append("HTTP ").append(error.getStatus())
                 .append(", Stormpath ").append(error.getCode())
-                .append(" (").append(error.getMoreInfo()).append("): ")
-                .append(error.getDeveloperMessage());
-        return sb.toString();
+                .append(" (").append(error.getMoreInfo()).append(")");
+
+        String requestId = error.getRequestId();
+
+        if (Strings.hasText(requestId)) {
+            sb.append(", RequestId ").append(error.getRequestId());
+        }
+
+        return sb.append(": ").append(error.getDeveloperMessage()).toString();
     }
 
     public ResourceException(Error error) {
@@ -57,6 +64,11 @@ public class ResourceException extends RuntimeException implements Error {
         return error.getStatus();
     }
 
+    /**
+     * Get the Stormpath Error Code
+     * Check http://docs.stormpath.com/errors/ for the list of Stormpath Error Codes
+     * @return the code of the error
+     */
     @Override
     public int getCode() {
         return error.getCode();
@@ -67,9 +79,19 @@ public class ResourceException extends RuntimeException implements Error {
         return error.getDeveloperMessage();
     }
 
+    /**
+     * More information about the error is described in the Stormpath Error Codes documentation
+     * Check http://docs.stormpath.com/errors/ for the list of Stormpath Error Codes
+     * @return the URI to the error documentation
+     */
     @Override
     public String getMoreInfo() {
         return error.getMoreInfo();
+    }
+
+    @Override
+    public String getRequestId() {
+        return error.getRequestId();
     }
 
     public Error getStormpathError() {

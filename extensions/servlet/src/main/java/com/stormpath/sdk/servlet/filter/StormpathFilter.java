@@ -17,9 +17,8 @@ package com.stormpath.sdk.servlet.filter;
 
 import com.stormpath.sdk.application.Application;
 import com.stormpath.sdk.client.Client;
+import com.stormpath.sdk.impl.http.HttpHeadersHolder;
 import com.stormpath.sdk.lang.Assert;
-import com.stormpath.sdk.lang.Strings;
-import com.stormpath.sdk.servlet.config.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,8 +26,12 @@ import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -42,10 +45,12 @@ public class StormpathFilter extends HttpFilter {
     private Set<String> clientRequestAttributeNames;
     private Set<String> applicationRequestAttributeNames;
     private WrappedServletRequestFactory factory;
+    private Client client;
+    private Application application;
 
     public StormpathFilter() {
-        this.clientRequestAttributeNames = java.util.Collections.emptySet();
-        this.applicationRequestAttributeNames = java.util.Collections.emptySet();
+        this.clientRequestAttributeNames = Collections.emptySet();
+        this.applicationRequestAttributeNames = Collections.emptySet();
     }
 
     public void setFilterChainResolver(FilterChainResolver filterChainResolver) {
@@ -68,37 +73,22 @@ public class StormpathFilter extends HttpFilter {
         this.factory = factory;
     }
 
-    @Override
-    protected void onInit() throws ServletException {
-        try {
-            doInit();
-        } catch (ServletException e) {
-            log.error("Unable to initialize StormpathFilter.", e);
-            throw e;
-        } catch (Exception e) {
-            String msg = "Unable to initialize StormpathFilter: " + e.getMessage();
-            log.error(msg, e);
-            throw new ServletException(msg);
-        }
+    public void setClient(Client client) {
+        this.client = client;
     }
 
-    protected void doInit() throws ServletException {
-        Config config = getConfig();
-        this.filterChainResolver = config.getInstance("stormpath.web.filter.chain.resolver");
+    public void setApplication(Application application) {
+        this.application = application;
+    }
 
-        String val = config.get("stormpath.web.request.client.attributeNames");
-        if (Strings.hasText(val)) {
-            String[] vals = Strings.split(val);
-            this.clientRequestAttributeNames = new LinkedHashSet<String>(Arrays.asList(vals));
-        }
-
-        val = config.get("stormpath.web.request.application.attributeNames");
-        if (Strings.hasText(val)) {
-            String[] vals = Strings.split(val);
-            this.applicationRequestAttributeNames = new LinkedHashSet<String>(Arrays.asList(vals));
-        }
-
-        this.factory = config.getInstance("stormpath.web.request.factory");
+    @Override
+    protected void onInit() throws ServletException {
+        Assert.notNull(filterChainResolver, "FilterChainResolver cannot be null.");
+        Assert.notNull(clientRequestAttributeNames, "clientRequestAttributeNames cannot be null.");
+        Assert.notNull(applicationRequestAttributeNames, "applicationRequestAttributeNames cannot be null.");
+        Assert.notNull(factory, "WrappedServletRequestFactory cannot be null.");
+        Assert.notNull(client, "Client instance cannot be null.");
+        Assert.notNull(application, "Application instance cannot be null.");
     }
 
     protected FilterChainResolver getFilterChainResolver() {
@@ -111,7 +101,7 @@ public class StormpathFilter extends HttpFilter {
 
         FilterChainResolver resolver = getFilterChainResolver();
         Assert.notNull(resolver, "Filter has not yet been configured. Explicitly call setFilterChainResolver or " +
-                                 "init(FilterConfig).");
+            "init(FilterConfig).");
 
         setRequestAttributes(request);
 
@@ -122,17 +112,29 @@ public class StormpathFilter extends HttpFilter {
 
         //continue:
         target.doFilter(request, response);
+
+        HttpHeadersHolder.clear();
     }
 
     protected void setRequestAttributes(HttpServletRequest request) {
         //ensure the Client and Application are conveniently available to all request filters/handlers:
         setClientRequestAttributes(request);
         setApplicationRequestAttributes(request);
+
+        // set client headers on a thread local so they can be retrieved in DefaultDataStore
+        Map<String, List<String>> headersMap = new LinkedHashMap<>();
+        Enumeration<String> headerNames = request.getHeaderNames();
+        while (headerNames.hasMoreElements()) {
+            String name = headerNames.nextElement();
+            // Tomcat returns all header names as lowercase. In case others don't, lowercase key name
+            // http://grokbase.com/t/tomcat/users/0968njb9en/header-names-lower-case
+            headersMap.put(name.toLowerCase(), Collections.list(request.getHeaders(name)));
+        }
+        HttpHeadersHolder.set(headersMap);
     }
 
     protected void setClientRequestAttributes(HttpServletRequest request) {
         String name = Client.class.getName();
-        Client client = (Client) request.getServletContext().getAttribute(name);
         //value must always be set:
         request.setAttribute(name, client);
 
@@ -144,7 +146,6 @@ public class StormpathFilter extends HttpFilter {
 
     protected void setApplicationRequestAttributes(HttpServletRequest request) {
         String name = Application.class.getName();
-        Application application = (Application) request.getServletContext().getAttribute(name);
         //this must always be set:
         request.setAttribute(name, application);
 

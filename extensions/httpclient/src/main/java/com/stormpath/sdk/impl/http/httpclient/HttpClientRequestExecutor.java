@@ -84,11 +84,13 @@ public class HttpClientRequestExecutor implements RequestExecutor {
 
     private static final int DEFAULT_MAX_RETRIES = 4;
 
-    private static final int DEFAULT_MAX_CONNECTIONS_PER_ROUTE = 10;
+    private static final int DEFAULT_MAX_CONNECTIONS_PER_ROUTE = Integer.MAX_VALUE/2;
     private static final String MAX_CONNECTIONS_PER_ROUTE_PROPERTY_KEY = "com.stormpath.sdk.impl.http.httpclient.HttpClientRequestExecutor.connPoolControl.maxPerRoute";
+    private static final int MAX_CONNECTIONS_PER_ROUTE;
 
-    private static final int DEFAULT_MAX_CONNECTIONS_TOTAL = 20;
+    private static final int DEFAULT_MAX_CONNECTIONS_TOTAL = Integer.MAX_VALUE;
     private static final String MAX_CONNECTIONS_TOTAL_PROPERTY_KEY = "com.stormpath.sdk.impl.http.httpclient.HttpClientRequestExecutor.connPoolControl.maxTotal";
+    private static final int MAX_CONNECTIONS_TOTAL;
 
     private int numRetries = DEFAULT_MAX_RETRIES;
 
@@ -106,6 +108,36 @@ public class HttpClientRequestExecutor implements RequestExecutor {
 
     //doesn't need to be SecureRandom: only used in backoff strategy, not for crypto:
     private final Random random = new Random();
+
+    static {
+        int connectionMaxPerRoute = DEFAULT_MAX_CONNECTIONS_PER_ROUTE;
+        String connectionMaxPerRouteString = System.getProperty(MAX_CONNECTIONS_PER_ROUTE_PROPERTY_KEY);
+        if (connectionMaxPerRouteString != null) {
+            try {
+                connectionMaxPerRoute = Integer.parseInt(connectionMaxPerRouteString);
+            } catch (NumberFormatException nfe) {
+                log.warn(
+                    "Bad max connection per route value: {}. Using default: {}.",
+                    connectionMaxPerRouteString, DEFAULT_MAX_CONNECTIONS_PER_ROUTE, nfe
+                );
+            }
+        }
+        MAX_CONNECTIONS_PER_ROUTE = connectionMaxPerRoute;
+
+        int connectionMaxTotal = DEFAULT_MAX_CONNECTIONS_TOTAL;
+        String connectionMaxTotalString = System.getProperty(MAX_CONNECTIONS_TOTAL_PROPERTY_KEY);
+        if (connectionMaxTotalString != null) {
+            try {
+                connectionMaxTotal = Integer.parseInt(connectionMaxTotalString);
+            } catch (NumberFormatException nfe) {
+                log.warn(
+                    "Bad max connection total value: {}. Using default: {}.",
+                    connectionMaxTotalString, DEFAULT_MAX_CONNECTIONS_TOTAL, nfe
+                );
+            }
+        }
+        MAX_CONNECTIONS_TOTAL = connectionMaxTotal;
+    }
 
     /**
      * Creates a new {@code HttpClientRequestExecutor} using the specified {@code ApiKey} and optional {@code Proxy}
@@ -125,37 +157,21 @@ public class HttpClientRequestExecutor implements RequestExecutor {
 
         this.httpClientRequestFactory = new HttpClientRequestFactory();
 
-        int connectionMaxPerRoute = DEFAULT_MAX_CONNECTIONS_PER_ROUTE;
-        try {
-            if (System.getProperty(MAX_CONNECTIONS_PER_ROUTE_PROPERTY_KEY) != null) {
-                connectionMaxPerRoute = Integer.parseInt(System.getProperty(MAX_CONNECTIONS_PER_ROUTE_PROPERTY_KEY));
-            }
-        } catch (NumberFormatException nfe) {
-            log.error(
-                "Bad max connection per route value: " + System.getProperty(MAX_CONNECTIONS_PER_ROUTE_PROPERTY_KEY) +
-                ". Using default: " + DEFAULT_MAX_CONNECTIONS_PER_ROUTE
-            );
-        }
+        PoolingClientConnectionManager connMgr = new PoolingClientConnectionManager();
+        if (MAX_CONNECTIONS_TOTAL >= MAX_CONNECTIONS_PER_ROUTE) {
+            connMgr.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_ROUTE);
+            connMgr.setMaxTotal(MAX_CONNECTIONS_TOTAL);
+        } else {
+            connMgr.setDefaultMaxPerRoute(DEFAULT_MAX_CONNECTIONS_PER_ROUTE);
+            connMgr.setMaxTotal(DEFAULT_MAX_CONNECTIONS_TOTAL);
 
-        int connectionMaxTotal = DEFAULT_MAX_CONNECTIONS_TOTAL;
-        try {
-            if (System.getProperty(MAX_CONNECTIONS_TOTAL_PROPERTY_KEY) != null) {
-                connectionMaxTotal = Integer.parseInt(System.getProperty(MAX_CONNECTIONS_TOTAL_PROPERTY_KEY));
-            }
-        } catch (NumberFormatException nfe) {
-            log.error(
-                "Bad max connection total value: " + System.getProperty(MAX_CONNECTIONS_TOTAL_PROPERTY_KEY) +
-                ". Using default: " + DEFAULT_MAX_CONNECTIONS_TOTAL
+            log.warn(
+                "{} ({}) is less than {} ({}). " +
+                "Reverting to defaults: connectionMaxTotal ({}) and connectionMaxPerRoute ({}).",
+                MAX_CONNECTIONS_TOTAL_PROPERTY_KEY, MAX_CONNECTIONS_TOTAL,
+                MAX_CONNECTIONS_PER_ROUTE_PROPERTY_KEY, MAX_CONNECTIONS_PER_ROUTE,
+                DEFAULT_MAX_CONNECTIONS_TOTAL, DEFAULT_MAX_CONNECTIONS_PER_ROUTE
             );
-        }
-
-        if (connectionMaxTotal < connectionMaxPerRoute) {
-            log.error(
-                "connectionMaxTotal (" + connectionMaxTotal + ") is less than connectionMaxPerRoute (" + connectionMaxPerRoute + "). " +
-                "Reverting to defaults: connectionMaxTotal (" + DEFAULT_MAX_CONNECTIONS_TOTAL + ") and connectionMaxPerRoute (" + DEFAULT_MAX_CONNECTIONS_TOTAL + ")."
-            );
-            connectionMaxPerRoute = DEFAULT_MAX_CONNECTIONS_PER_ROUTE;
-            connectionMaxTotal = DEFAULT_MAX_CONNECTIONS_TOTAL;
         }
 
         PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager();
@@ -217,10 +233,6 @@ public class HttpClientRequestExecutor implements RequestExecutor {
 
         Assert.notNull(request, "Request argument cannot be null.");
 
-        /*if (requestLog.isDebugEnabled()) {
-            requestLog.debug("Sending Request: " + request.toString());
-        }*/
-
         int retryCount = 0;
         URI redirectUri = null;
         HttpEntity entity = null;
@@ -266,7 +278,10 @@ public class HttpClientRequestExecutor implements RequestExecutor {
 
             HttpResponse httpResponse = null;
             try {
-                if (retryCount > 0) {
+                // We don't want to treat a redirect like a retry,
+                // so if redirectUri is not null, we won't pause
+                // before executing the request below.
+                if (retryCount > 0 && redirectUri == null) {
                     pauseExponentially(retryCount, exception);
                     if (entity != null) {
                         InputStream content = entity.getContent();
@@ -276,13 +291,12 @@ public class HttpClientRequestExecutor implements RequestExecutor {
                     }
                 }
 
+                // reset redirectUri so that if there is an exception, we will pause on retry
+                redirectUri = null;
                 exception = null;
                 retryCount++;
 
-                //long start = System.currentTimeMillis();
                 httpResponse = httpClient.execute(httpRequest);
-                //long end = System.currentTimeMillis();
-                //executionContext.getTimingInfo().addSubMeasurement(HTTP_REQUEST_TIME, new TimingInfo(start, end));
 
                 if (isRedirect(httpResponse)) {
                     Header[] locationHeaders = httpResponse.getHeaders("Location");
@@ -307,7 +321,7 @@ public class HttpClientRequestExecutor implements RequestExecutor {
                     return response;
                 }
             } catch (Throwable t) {
-                log.warn("Unable to execute HTTP request: " + t.getMessage());
+                log.warn("Unable to execute HTTP request: ", t.getMessage(), t);
 
                 if (t instanceof RestException) {
                     exception = (RestException)t;
@@ -334,11 +348,6 @@ public class HttpClientRequestExecutor implements RequestExecutor {
                 response.getHeaders("Location").length > 0;
     }
 
-    /*private boolean isRequestSuccessful(org.apache.http.HttpResponse response) {
-        int status = response.getStatusLine().getStatusCode();
-        return status >= 200 && status < 300;
-    }*/
-
     /**
      * Exponential sleep on failed request to avoid flooding a service with
      * retries.
@@ -359,9 +368,7 @@ public class HttpClientRequestExecutor implements RequestExecutor {
         }
 
         delay = Math.min(delay, MAX_BACKOFF_IN_MILLISECONDS);
-        if (log.isDebugEnabled()) {
-            log.debug("Retryable condition detected, will retry in " + delay + "ms, attempt number: " + retries);
-        }
+        log.debug("Retryable condition detected, will retry in {}ms, attempt number: {}", delay, retries);
 
         try {
             Thread.sleep(delay);
@@ -395,10 +402,7 @@ public class HttpClientRequestExecutor implements RequestExecutor {
                 t instanceof SocketException ||
                 t instanceof SocketTimeoutException ||
                 t instanceof ConnectTimeoutException) {
-            if (log.isDebugEnabled()) {
-                log.debug("Retrying on " + t.getClass().getName()
-                        + ": " + t.getMessage());
-            }
+            log.debug("Retrying on {}: {}", t.getClass().getName(), t.getMessage());
             return true;
         }
 
@@ -455,7 +459,11 @@ public class HttpClientRequestExecutor implements RequestExecutor {
             }
         }
 
-        return new DefaultResponse(httpStatus, mediaType, body, contentLength);
+        Response response = new DefaultResponse(httpStatus, mediaType, body, contentLength);
+
+        response.getHeaders().add(HttpHeaders.STORMPATH_REQUEST_ID, headers.getStormpathRequestId());
+
+        return response;
     }
 
     private HttpEntity getHttpEntity(HttpResponse response) {

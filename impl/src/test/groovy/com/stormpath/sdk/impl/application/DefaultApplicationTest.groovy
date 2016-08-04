@@ -16,7 +16,12 @@
 package com.stormpath.sdk.impl.application
 
 import com.fasterxml.jackson.databind.util.ISO8601DateFormat
-import com.stormpath.sdk.account.*
+import com.stormpath.sdk.account.Account
+import com.stormpath.sdk.account.AccountCriteria
+import com.stormpath.sdk.account.AccountList
+import com.stormpath.sdk.account.CreateAccountRequest
+import com.stormpath.sdk.account.PasswordResetToken
+import com.stormpath.sdk.account.VerificationEmailRequest
 import com.stormpath.sdk.api.ApiKey
 import com.stormpath.sdk.api.ApiKeys
 import com.stormpath.sdk.application.Application
@@ -24,12 +29,16 @@ import com.stormpath.sdk.application.ApplicationAccountStoreMapping
 import com.stormpath.sdk.application.ApplicationAccountStoreMappingList
 import com.stormpath.sdk.application.ApplicationStatus
 import com.stormpath.sdk.authc.AuthenticationResult
-import com.stormpath.sdk.authc.UsernamePasswordRequest
+import com.stormpath.sdk.authc.UsernamePasswordRequests
 import com.stormpath.sdk.directory.AccountStore
 import com.stormpath.sdk.directory.CustomData
 import com.stormpath.sdk.directory.Directory
 import com.stormpath.sdk.directory.DirectoryCriteria
-import com.stormpath.sdk.group.*
+import com.stormpath.sdk.group.CreateGroupRequest
+import com.stormpath.sdk.group.Group
+import com.stormpath.sdk.group.GroupCriteria
+import com.stormpath.sdk.group.GroupList
+import com.stormpath.sdk.group.GroupOptions
 import com.stormpath.sdk.http.HttpMethod
 import com.stormpath.sdk.impl.account.DefaultAccountList
 import com.stormpath.sdk.impl.account.DefaultPasswordResetToken
@@ -58,8 +67,13 @@ import com.stormpath.sdk.impl.resource.StringProperty
 import com.stormpath.sdk.impl.saml.DefaultSamlPolicy
 import com.stormpath.sdk.impl.tenant.DefaultTenant
 import com.stormpath.sdk.lang.Objects
-import com.stormpath.sdk.oauth.OauthPolicy
-import com.stormpath.sdk.provider.*
+import com.stormpath.sdk.oauth.OAuthPolicy
+import com.stormpath.sdk.organization.Organization
+import com.stormpath.sdk.provider.FacebookProviderData
+import com.stormpath.sdk.provider.GithubProviderData
+import com.stormpath.sdk.provider.ProviderAccountRequest
+import com.stormpath.sdk.provider.ProviderAccountResult
+import com.stormpath.sdk.provider.Providers
 import com.stormpath.sdk.resource.Resource
 import com.stormpath.sdk.saml.SamlPolicy
 import com.stormpath.sdk.tenant.Tenant
@@ -70,6 +84,7 @@ import org.testng.annotations.Test
 import java.text.DateFormat
 
 import static org.easymock.EasyMock.*
+import static org.powermock.api.easymock.PowerMock.createStrictMock
 import static org.testng.Assert.*
 
 /**
@@ -99,7 +114,7 @@ class DefaultApplicationTest {
         //since 1.0.0
         assertTrue(propertyDescriptors.get("customData") instanceof ResourceReference && propertyDescriptors.get("customData").getType().equals(CustomData))
         //since 1.0.RC7
-        assertTrue(propertyDescriptors.get("oAuthPolicy") instanceof ResourceReference && propertyDescriptors.get("oAuthPolicy").getType().equals(OauthPolicy))
+        assertTrue(propertyDescriptors.get("oAuthPolicy") instanceof ResourceReference && propertyDescriptors.get("oAuthPolicy").getType().equals(OAuthPolicy))
         //since 1.0.RC8
         assertTrue(propertyDescriptors.get("samlPolicy") instanceof ResourceReference && propertyDescriptors.get("samlPolicy").getType().equals(SamlPolicy))
         assertTrue(propertyDescriptors.get("authorizedCallbackUris") instanceof ListProperty)
@@ -185,7 +200,7 @@ class DefaultApplicationTest {
         defaultBasicLoginAttempt.setType("basic")
         defaultBasicLoginAttempt.setValue("dXNlcm5hbWU6cGFzc3dvcmQ=")
 
-        def options = UsernamePasswordRequest.options().withAccount()
+        def options = UsernamePasswordRequests.options().withAccount()
          expect(internalDataStore.create((String) properties.href + "/loginAttempts", defaultBasicLoginAttempt, AuthenticationResult.class, options)).andReturn(authenticationResult02)
 
         replay internalDataStore, groupCriteria, accountCriteria, account
@@ -218,9 +233,9 @@ class DefaultApplicationTest {
 
         assertEquals(defaultApplication.sendPasswordResetEmail("some@email.com").getAccount(), account)
         assertEquals(defaultApplication.verifyPasswordResetToken("token"), account)
-        assertEquals(defaultApplication.authenticateAccount(new UsernamePasswordRequest("username", "password")), authenticationResult01)
+        assertEquals(defaultApplication.authenticateAccount(UsernamePasswordRequests.builder().setUsernameOrEmail("username").setPassword("password").build()), authenticationResult01)
 
-        def request = UsernamePasswordRequest.builder().setUsernameOrEmail("username").setPassword("password").withResponseOptions(options).build()
+        def request = UsernamePasswordRequests.builder().setUsernameOrEmail("username").setPassword("password").withResponseOptions(options).build()
         assertEquals(defaultApplication.authenticateAccount(request), authenticationResult02)
 
         verify internalDataStore, groupCriteria, accountCriteria, account
@@ -353,8 +368,7 @@ class DefaultApplicationTest {
     void testCreateGroupWithNullArgument() {
         def app = new DefaultApplication(createStrictMock(InternalDataStore))
 
-        Group group = null
-        app.createGroup(group)
+        app.createGroup((Group) null)
     }
 
     @Test
@@ -714,7 +728,7 @@ class DefaultApplicationTest {
 
         assertEquals(defaultApplication.sendPasswordResetEmail("some@email.com").getAccount(), account)
         assertEquals(defaultApplication.resetPassword("token", "myNewPassword"), account)
-        assertEquals(defaultApplication.authenticateAccount(new UsernamePasswordRequest("username", "myNewPassword")), authenticationResult, null)
+        assertEquals(defaultApplication.authenticateAccount(UsernamePasswordRequests.builder().setUsernameOrEmail("username").setPassword("myNewPassword").build()), authenticationResult, null)
 
         verify internalDataStore, account
     }
@@ -897,6 +911,55 @@ class DefaultApplicationTest {
         } catch (IllegalArgumentException e) {
             assertEquals(e.getMessage(), "criteria cannot be null.")
         }
+    }
+
+    /** @since 1.0.RC9 */
+    @Test
+    void testAddAccountStoreByHrefDirectories() {
+
+        testAddAccountStoreByHref("directories", Directory)
+    }
+
+    /** @since 1.0.RC9 */
+    @Test
+    void testAddAccountStoreByHrefGroups() {
+
+        testAddAccountStoreByHref("groups", Group)
+    }
+
+    /** @since 1.0.RC9 */
+    @Test
+    void testAddAccountStoreByHrefOrganizations() {
+
+        testAddAccountStoreByHref("organizations", Organization)
+    }
+
+    /** @since 1.0.RC9 */
+    private void testAddAccountStoreByHref(String accountStoreType, Class accountStoreClass) {
+
+        def hrefprefix = "https://api.stormpath.com/v1"
+        def hrefSuffix = "3KYfZ61QQXLR5ph34KXjpt"
+
+        def internalDataStore = createStrictMock(InternalDataStore)
+        def accountStore = createStrictMock(AccountStore)
+        def accountStoreMapping = createStrictMock(ApplicationAccountStoreMapping)
+        def application = new DefaultApplication(internalDataStore, ["href":hrefprefix+"/applications/"+hrefSuffix])
+
+        def resourceUrl = hrefprefix + "/" + accountStoreType + "/" + hrefSuffix
+
+        expect(internalDataStore.getResource(resourceUrl, accountStoreClass)).andReturn(accountStore)
+
+        expect(internalDataStore.instantiate(ApplicationAccountStoreMapping)).andReturn(accountStoreMapping)
+        expect(accountStoreMapping.setAccountStore(accountStore)).andReturn(accountStoreMapping);
+        expect(accountStoreMapping.setApplication(application)).andReturn(accountStoreMapping);
+        expect(accountStoreMapping.setListIndex(Integer.MAX_VALUE)).andReturn(accountStoreMapping);
+        expect(internalDataStore.create("/accountStoreMappings", accountStoreMapping)).andReturn(accountStoreMapping)
+
+        replay internalDataStore, accountStore, accountStoreMapping
+
+        application.addAccountStore(resourceUrl)
+
+        verify internalDataStore, accountStore, accountStoreMapping
     }
 
     /**

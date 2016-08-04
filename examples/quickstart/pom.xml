@@ -2,20 +2,27 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <parent>
+        <groupId>com.stormpath.sdk</groupId>
+        <artifactId>stormpath-sdk-examples</artifactId>
+        <version>1.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
     <groupId>com.stormpath.sdk</groupId>
     <artifactId>stormpath-sdk-examples-quickstart</artifactId>
-    <version>1.0.RC9-dhatim</version>
+    <version>1.0.1-SNAPSHOT</version>
 
     <name>Stormpath Java SDK :: Examples :: Quickstart Code</name>
     <description>A simple (non-web) application to demonstrate the example code in the Stormpath Java Quickstart</description>
     <packaging>jar</packaging>
 
     <properties>
-        <groovy.version>1.8.8</groovy.version>
-        <jdk.version>1.6</jdk.version>
-        <logback.version>1.1.2</logback.version>
+        <groovy.version>2.4.7</groovy.version>
+        <jdk.version>1.7</jdk.version>
+        <logback.version>1.1.7</logback.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <testng.version>6.8</testng.version>
+        <testng.version>6.9.10</testng.version>
     </properties>
 
     <dependencies>
@@ -87,16 +94,8 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.0</version>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-deploy-plugin</artifactId>
                 <version>2.7</version>
-                <configuration>
-                    <skip>true</skip>
-                </configuration>
             </plugin>
         </plugins>
     </build>

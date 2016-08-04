@@ -470,7 +470,7 @@ class AccountIT extends ClientIT {
     }
 
     //@since 1.0.RC3
-    @Test
+    @Test(enabled = false)
     void testCustomData() {
         def app = createTempApp()
         def account = client.instantiate(Account)
@@ -1013,6 +1013,21 @@ class AccountIT extends ClientIT {
             assertTrue e instanceof IllegalStateException
             assertEquals "This account does not belong to the specified group.", e.getMessage()
         }
+    }
+
+    /**
+     * Asserts https://github.com/stormpath/stormpath-sdk-java/issues/520
+     * @since 1.0.RC9
+     */
+    @Test
+    public void testSaveWithResponseOptionsIsCachedProperly() {
+        def app = createTempApp()
+        Account account = createTestAccount(app)
+        account = account.setGivenName("newFooGivenName");
+        account = account.saveWithResponseOptions(Accounts.options().withCustomData())
+        assertEquals account.getGivenName(), "newFooGivenName"
+        account = client.getResource(account.getHref(), Account.class)
+        assertEquals account.getGivenName(), "newFooGivenName"
     }
 
     //@since 1.0.RC3

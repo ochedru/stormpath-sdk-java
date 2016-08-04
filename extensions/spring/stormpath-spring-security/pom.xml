@@ -19,7 +19,7 @@
     <parent>
         <groupId>com.stormpath.spring</groupId>
         <artifactId>stormpath-spring-parent</artifactId>
-        <version>1.0.RC9-dhatim</version>
+        <version>1.0.1-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -64,8 +64,10 @@
             <groupId>org.springframework</groupId>
             <artifactId>spring-test</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-core</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
-
-
 </project>

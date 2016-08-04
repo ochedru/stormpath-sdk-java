@@ -22,16 +22,15 @@ import com.stormpath.sdk.account.Accounts;
 import com.stormpath.sdk.account.CreateAccountRequest;
 import com.stormpath.sdk.account.PasswordResetToken;
 import com.stormpath.sdk.account.VerificationEmailRequest;
-import com.stormpath.sdk.api.ApiAuthenticationResult;
 import com.stormpath.sdk.api.ApiKey;
 import com.stormpath.sdk.api.ApiKeyCriteria;
 import com.stormpath.sdk.api.ApiKeyList;
 import com.stormpath.sdk.api.ApiKeyOptions;
 import com.stormpath.sdk.application.Application;
 import com.stormpath.sdk.application.ApplicationAccountStoreMapping;
+import com.stormpath.sdk.application.ApplicationAccountStoreMappingCriteria;
 import com.stormpath.sdk.application.ApplicationAccountStoreMappingList;
 import com.stormpath.sdk.application.ApplicationOptions;
-import com.stormpath.sdk.application.ApplicationAccountStoreMappingCriteria;
 import com.stormpath.sdk.application.ApplicationStatus;
 import com.stormpath.sdk.authc.AuthenticationRequest;
 import com.stormpath.sdk.authc.AuthenticationResult;
@@ -40,9 +39,9 @@ import com.stormpath.sdk.directory.Directories;
 import com.stormpath.sdk.directory.Directory;
 import com.stormpath.sdk.directory.DirectoryCriteria;
 import com.stormpath.sdk.directory.DirectoryList;
-import com.stormpath.sdk.group.GroupCriteria;
 import com.stormpath.sdk.group.CreateGroupRequest;
 import com.stormpath.sdk.group.Group;
+import com.stormpath.sdk.group.GroupCriteria;
 import com.stormpath.sdk.group.GroupList;
 import com.stormpath.sdk.group.Groups;
 import com.stormpath.sdk.http.HttpRequest;
@@ -53,14 +52,14 @@ import com.stormpath.sdk.impl.account.DefaultVerificationEmailRequest;
 import com.stormpath.sdk.impl.api.DefaultApiKeyCriteria;
 import com.stormpath.sdk.impl.api.DefaultApiKeyOptions;
 import com.stormpath.sdk.impl.authc.AuthenticationRequestDispatcher;
-import com.stormpath.sdk.impl.authc.DefaultApiRequestAuthenticator;
 import com.stormpath.sdk.impl.ds.InternalDataStore;
 import com.stormpath.sdk.impl.idsite.DefaultIdSiteCallbackHandler;
 import com.stormpath.sdk.impl.idsite.DefaultIdSiteUrlBuilder;
 import com.stormpath.sdk.impl.oauth.DefaultIdSiteAuthenticator;
-import com.stormpath.sdk.impl.oauth.DefaultJwtAuthenticator;
-import com.stormpath.sdk.impl.oauth.DefaultPasswordGrantAuthenticator;
-import com.stormpath.sdk.impl.oauth.DefaultRefreshGrantAuthenticator;
+import com.stormpath.sdk.impl.oauth.DefaultOAuthBearerRequestAuthenticator;
+import com.stormpath.sdk.impl.oauth.DefaultOAuthClientCredentialsGrantRequestAuthenticator;
+import com.stormpath.sdk.impl.oauth.DefaultOAuthPasswordGrantRequestAuthenticator;
+import com.stormpath.sdk.impl.oauth.DefaultOAuthRefreshTokenRequestAuthenticator;
 import com.stormpath.sdk.impl.provider.ProviderAccountResolver;
 import com.stormpath.sdk.impl.query.DefaultEqualsExpressionFactory;
 import com.stormpath.sdk.impl.query.Expandable;
@@ -77,11 +76,12 @@ import com.stormpath.sdk.impl.saml.DefaultSamlIdpUrlBuilder;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.lang.Classes;
 import com.stormpath.sdk.oauth.IdSiteAuthenticator;
-import com.stormpath.sdk.oauth.JwtAuthenticator;
-import com.stormpath.sdk.oauth.OauthPolicy;
-import com.stormpath.sdk.oauth.PasswordGrantAuthenticator;
-import com.stormpath.sdk.oauth.OauthRequestAuthenticator;
-import com.stormpath.sdk.oauth.RefreshGrantAuthenticator;
+import com.stormpath.sdk.oauth.OAuthApiRequestAuthenticator;
+import com.stormpath.sdk.oauth.OAuthBearerRequestAuthenticator;
+import com.stormpath.sdk.oauth.OAuthClientCredentialsGrantRequestAuthenticator;
+import com.stormpath.sdk.oauth.OAuthPasswordGrantRequestAuthenticator;
+import com.stormpath.sdk.oauth.OAuthPolicy;
+import com.stormpath.sdk.oauth.OAuthRefreshTokenRequestAuthenticator;
 import com.stormpath.sdk.organization.Organization;
 import com.stormpath.sdk.organization.OrganizationCriteria;
 import com.stormpath.sdk.organization.OrganizationList;
@@ -96,7 +96,6 @@ import com.stormpath.sdk.tenant.Tenant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -113,14 +112,14 @@ import static com.stormpath.sdk.impl.api.ApiKeyParameter.ID;
 public class DefaultApplication extends AbstractExtendableInstanceResource implements Application {
 
     private static final String OAUTH_REQUEST_AUTHENTICATOR_FQCN =
-        "com.stormpath.sdk.impl.oauth.authc.DefaultOauthRequestAuthenticator";
+        "com.stormpath.sdk.impl.oauth.authc.DefaultOAuthRequestAuthenticator";
 
     private static final String OAUTH_BUILDER_NOT_AVAILABLE_MSG;
 
     private static final String OAUTH_AUTHENTICATION_REQUEST_DISPATCHER_FQCN =
-        "com.stormpath.sdk.impl.oauth.authc.OauthAuthenticationRequestDispatcher";
+        "com.stormpath.sdk.impl.oauth.authc.OAuthAuthenticationRequestDispatcher";
 
-    private static final Class<OauthRequestAuthenticator> OAUTH_AUTHENTICATION_REQUEST_BUILDER_CLASS;
+    private static final Class<OAuthApiRequestAuthenticator> OAUTH_AUTHENTICATION_REQUEST_BUILDER_CLASS;
 
     private static final Class<AuthenticationRequestDispatcher> AUTHENTICATION_REQUEST_DISPATCHER_CLASS;
 
@@ -176,8 +175,8 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
         new ResourceReference<ApplicationAccountStoreMapping>("defaultAccountStoreMapping", ApplicationAccountStoreMapping.class);
     static final ResourceReference<ApplicationAccountStoreMapping> DEFAULT_GROUP_STORE_MAPPING   =
         new ResourceReference<ApplicationAccountStoreMapping>("defaultGroupStoreMapping", ApplicationAccountStoreMapping.class);
-    static final ResourceReference<OauthPolicy> OAUTH_POLICY   =
-            new ResourceReference<OauthPolicy>("oAuthPolicy", OauthPolicy.class);
+    static final ResourceReference<OAuthPolicy> OAUTH_POLICY   =
+            new ResourceReference<OAuthPolicy>("oAuthPolicy", OAuthPolicy.class);
     static final ResourceReference<SamlPolicy> SAML_POLICY =
             new ResourceReference<SamlPolicy>("samlPolicy", SamlPolicy.class);
 
@@ -365,7 +364,7 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
     }
 
     /** @since 1.0.RC7 */
-    public OauthPolicy getOauthPolicy() {
+    public OAuthPolicy getOAuthPolicy() {
         return getResourceProperty(OAUTH_POLICY);
     }
 
@@ -465,9 +464,9 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
         return getDataStore().getResource(accountStoreMappings.getHref(), ApplicationAccountStoreMappingList.class, queryParams);
     }
 
-    /** @since 0.9 */
+    /** @since 1.0.RC9 */
     @Override
-    public ApplicationAccountStoreMappingList getApplicationAccountStoreMappings(ApplicationAccountStoreMappingCriteria criteria) {
+    public ApplicationAccountStoreMappingList getAccountStoreMappings(ApplicationAccountStoreMappingCriteria criteria) {
         ApplicationAccountStoreMappingList accountStoreMappings =
             getAccountStoreMappings(); //safe to get the href: does not execute a query until iteration occurs
         return getDataStore().getResource(accountStoreMappings.getHref(), ApplicationAccountStoreMappingList.class, (Criteria<ApplicationAccountStoreMappingCriteria>) criteria);
@@ -611,25 +610,6 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
         //        AccountStoreMappingList accountStoreMappingList = getAccountStoreMappings();
         //        return accountStoreMappingList.getHref();
         return href;
-    }
-
-    @Override
-    @Deprecated
-    public ApiAuthenticationResult authenticateApiRequest(Object httpRequest) {
-        validateHttpRequest(httpRequest);
-        return new DefaultApiRequestAuthenticator(this, (HttpRequest) httpRequest).execute();
-    }
-
-    @Override
-    @Deprecated
-    public OauthRequestAuthenticator authenticateOauthRequest(Object httpRequest) {
-        if (OAUTH_AUTHENTICATION_REQUEST_BUILDER_CLASS == null) {
-            throw new IllegalStateException(OAUTH_BUILDER_NOT_AVAILABLE_MSG);
-        }
-        validateHttpRequest(httpRequest);
-        Constructor<OauthRequestAuthenticator> ctor =
-            Classes.getConstructor(OAUTH_AUTHENTICATION_REQUEST_BUILDER_CLASS, Application.class, Object.class);
-        return Classes.instantiate(ctor, this, httpRequest);
     }
 
     /** @since 1.0.RC */
@@ -858,19 +838,24 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
         return this;
     }
 
-    /* @since 1.0.RC7 */
-    public PasswordGrantAuthenticator createPasswordGrantAuthenticator() {
-        return new DefaultPasswordGrantAuthenticator(this, getDataStore());
+    /* @since 1.0.0 */
+    public OAuthClientCredentialsGrantRequestAuthenticator createClientCredentialsGrantAuthenticator() {
+        return new DefaultOAuthClientCredentialsGrantRequestAuthenticator(this, getDataStore());
     }
 
     /* @since 1.0.RC7 */
-    public RefreshGrantAuthenticator createRefreshGrantAuthenticator() {
-        return new DefaultRefreshGrantAuthenticator(this, getDataStore());
+    public OAuthPasswordGrantRequestAuthenticator createPasswordGrantAuthenticator() {
+        return new DefaultOAuthPasswordGrantRequestAuthenticator(this, getDataStore());
     }
 
     /* @since 1.0.RC7 */
-    public JwtAuthenticator createJwtAuthenticator() {
-        return new DefaultJwtAuthenticator(this, getDataStore());
+    public OAuthRefreshTokenRequestAuthenticator createRefreshGrantAuthenticator() {
+        return new DefaultOAuthRefreshTokenRequestAuthenticator(this, getDataStore());
+    }
+
+    /* @since 1.0.RC7 */
+    public OAuthBearerRequestAuthenticator createJwtAuthenticator() {
+        return new DefaultOAuthBearerRequestAuthenticator(this, getDataStore());
     }
 
     public OrganizationList getOrganizations() {
@@ -892,5 +877,5 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
     /* @since 1.0.RC8.2 */
     public IdSiteAuthenticator createIdSiteAuthenticator(){
         return new DefaultIdSiteAuthenticator(this, getDataStore());
-    }    
+    }
 }

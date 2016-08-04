@@ -23,8 +23,8 @@ import com.stormpath.sdk.client.Client
 import com.stormpath.sdk.directory.Directory
 import com.stormpath.sdk.lang.Assert
 import com.stormpath.sdk.oauth.Authenticators
-import com.stormpath.sdk.oauth.Oauth2Requests
-import com.stormpath.sdk.oauth.PasswordGrantRequest
+import com.stormpath.sdk.oauth.OAuthPasswordGrantRequestAuthentication
+import com.stormpath.sdk.oauth.OAuthRequests
 import com.stormpath.sdk.resource.Deletable
 import com.stormpath.sdk.servlet.authc.impl.DefaultLogoutRequestEvent
 import com.stormpath.sdk.servlet.client.ClientLoader
@@ -34,10 +34,9 @@ import com.stormpath.sdk.servlet.event.RequestEventListener
 import com.stormpath.sdk.servlet.event.TokenRevocationRequestEventListener
 import com.stormpath.sdk.servlet.event.impl.RequestEventPublisher
 import com.stormpath.spring.filter.SpringSecurityResolvedAccountFilter
-import com.stormpath.spring.oauth.Oauth2AuthenticationSpringSecurityProcessingFilter
+import com.stormpath.spring.oauth.OAuthAuthenticationSpringSecurityProcessingFilter
 import com.stormpath.spring.security.authz.CustomDataPermissionsEditor
 import com.stormpath.spring.security.provider.StormpathAuthenticationProvider
-import com.stormpath.spring.security.provider.StormpathUserDetails
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -48,6 +47,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.testng.AbstractTestNGSpringContextTests
 import org.springframework.test.context.web.WebAppConfiguration
@@ -60,18 +60,12 @@ import javax.servlet.ServletContext
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
-import static org.easymock.EasyMock.createStrictMock
-import static org.easymock.EasyMock.expect
-import static org.easymock.EasyMock.replay
-import static org.easymock.EasyMock.verify
-import static org.testng.Assert.assertEquals
-import static org.testng.Assert.assertNotNull
-import static org.testng.Assert.assertTrue
-
+import static org.easymock.EasyMock.*
+import static org.testng.Assert.*
 /**
  * @since 1.0.RC5
  */
-@ContextConfiguration(classes = [MinimalStormpathSpringSecurityWebMvcAppConfig.class, TwoAppTenantStormpathConfiguration.class])
+@ContextConfiguration(classes = [MinimalStormpathSpringSecurityWebMvcTestAppConfig.class, TwoAppTenantStormpathTestConfiguration.class])
 @WebAppConfiguration
 class MinimalStormpathSpringSecurityWebMvcConfigurationIT extends AbstractTestNGSpringContextTests {
 
@@ -96,7 +90,7 @@ class MinimalStormpathSpringSecurityWebMvcConfigurationIT extends AbstractTestNG
     Filter stormpathFilter
 
     @Autowired
-    Oauth2AuthenticationSpringSecurityProcessingFilter oauth2AuthenticationSpringSecurityProcessingFilter
+    OAuthAuthenticationSpringSecurityProcessingFilter oauth2AuthenticationSpringSecurityProcessingFilter
 
     @Autowired
     SpringSecurityResolvedAccountFilter springSecurityResolvedAccountFilter
@@ -139,9 +133,7 @@ class MinimalStormpathSpringSecurityWebMvcConfigurationIT extends AbstractTestNG
         assertTrue stormpathMethodSecurityExpressionHandler.defaultRolePrefix.equals("")
 
         assertNotNull stormpathAuthenticationProvider
-        assertNotNull stormpathAuthenticationProvider.applicationRestUrl
-        assertNotNull stormpathAuthenticationProvider.client
-        assertNotNull stormpathAuthenticationProvider.client
+        assertNotNull stormpathAuthenticationProvider.application
     }
 
     /**
@@ -175,7 +167,7 @@ class MinimalStormpathSpringSecurityWebMvcConfigurationIT extends AbstractTestNG
 
         Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(account.getEmail(), password))
         assertTrue authentication.authenticated
-        assertTrue (((StormpathUserDetails)authentication.principal).getUsername().equals(account.getUsername()))
+        assertTrue (((UserDetails)authentication.principal).getUsername().equals(account.getHref()))
         assertTrue hasRole(authentication, ["user:edit"] as String[])
         SecurityContextHolder.clearContext()
     }
@@ -189,8 +181,8 @@ class MinimalStormpathSpringSecurityWebMvcConfigurationIT extends AbstractTestNG
         def httpServletResponse = createStrictMock(HttpServletResponse.class)
         def servletContext = createStrictMock(ServletContext.class)
 
-        PasswordGrantRequest passwordGrantRequest = Oauth2Requests.PASSWORD_GRANT_REQUEST.builder().setLogin(account.getEmail()).setPassword(password).build();
-        def result = Authenticators.PASSWORD_GRANT_AUTHENTICATOR.forApplication(application).authenticate(passwordGrantRequest)
+        OAuthPasswordGrantRequestAuthentication passwordGrantRequest = OAuthRequests.OAUTH_PASSWORD_GRANT_REQUEST.builder().setLogin(account.getEmail()).setPassword(password).build();
+        def result = Authenticators.OAUTH_PASSWORD_GRANT_REQUEST_AUTHENTICATOR.forApplication(application).authenticate(passwordGrantRequest)
         def accessToken = result.getAccessToken()
 
         expect(httpServletRequest.getHeader("Authorization")).andReturn("Bearer " + accessToken.getJwt())
@@ -209,6 +201,46 @@ class MinimalStormpathSpringSecurityWebMvcConfigurationIT extends AbstractTestNG
         Assert.isTrue(account.getRefreshTokens().getSize() == 0)
 
         verify(httpServletRequest, httpServletResponse, servletContext)
+    }
+
+    /**
+     * Asserts https://github.com/stormpath/stormpath-sdk-java/issues/605
+     * @since 1.0.0
+     */
+    @Test(enabled=false)
+    void testPreAuthenticationCheckOnCookieRequest() {
+        HttpServletRequest servletRequest = createStrictMock(HttpServletRequest)
+        HttpServletResponse servletResponse = createStrictMock(HttpServletResponse)
+        javax.servlet.FilterChain filterChain = createStrictMock(javax.servlet.FilterChain)
+        Authentication authentication = createStrictMock(Authentication.class)
+        Account account = createStrictMock(Account)
+
+        expect(servletRequest.getAttribute(Account.class.getName())).andReturn(account)
+
+        def userDetails = createStrictMock(UserDetails)
+
+        // set href on account that's retrieved from request
+        expect(account.getHref()).andReturn "url"
+
+        Map<String, String> props = new HashMap()
+        props.put("href", "url")
+
+        // return matching href on account so authentication is not performed
+        expect(userDetails.getUsername()).andReturn('url')
+
+        expect(authentication.getPrincipal()).andStubReturn(userDetails)
+
+        // set authentication
+        SecurityContextHolder.getContext().setAuthentication(authentication)
+
+        replay account, authentication, servletRequest, userDetails
+
+        ((SpringSecurityResolvedAccountFilter)springSecurityResolvedAccountFilter).filter(servletRequest, servletResponse, filterChain)
+
+        verify account, authentication, servletRequest, userDetails
+
+        // verify authentication object was not changed, meaning backend was not contacted
+        Assert.isTrue(SecurityContextHolder.getContext().getAuthentication().equals(authentication))
     }
 
     ///Supporting properties and methods

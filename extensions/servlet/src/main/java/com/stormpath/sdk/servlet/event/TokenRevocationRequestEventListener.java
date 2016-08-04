@@ -26,8 +26,10 @@ import com.stormpath.sdk.servlet.authc.FailedAuthenticationRequestEvent;
 import com.stormpath.sdk.servlet.authc.LogoutRequestEvent;
 import com.stormpath.sdk.servlet.authc.SuccessfulAuthenticationRequestEvent;
 import com.stormpath.sdk.servlet.client.ClientResolver;
+import com.stormpath.sdk.servlet.http.CookieResolver;
 import com.stormpath.sdk.servlet.oauth.impl.JwtTokenSigningKeyResolver;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.apache.oltu.oauth2.rs.extractor.BearerHeaderTokenExtractor;
@@ -47,6 +49,7 @@ public class TokenRevocationRequestEventListener implements RequestEventListener
     private static final Logger log = LoggerFactory.getLogger(TokenRevocationRequestEventListener.class);
 
     private final TokenExtractor tokenExtractor = new BearerHeaderTokenExtractor();
+    private final CookieResolver accessTokenCookieResolver = new CookieResolver("access_token");
 
     private final JwtTokenSigningKeyResolver jwtTokenSigningKeyResolver = new JwtTokenSigningKeyResolver();
 
@@ -74,32 +77,48 @@ public class TokenRevocationRequestEventListener implements RequestEventListener
 
     @Override
     public void on(LogoutRequestEvent event) {
-        String jwt = tokenExtractor.getAccessToken(event.getRequest());
+        String jwt = getJwtFromLogoutRequestEvent(event);
         if (jwt != null) {
             if (this.client == null) {
                 this.client = ClientResolver.INSTANCE.getClient(event.getRequest()); //will throw if not found
             }
 
             Key signingKey = jwtTokenSigningKeyResolver.getSigningKey(event.getRequest(), event.getResponse(), null, SignatureAlgorithm.HS256);
+            JwsHeader header = Jwts.parser().setSigningKey(signingKey.getEncoded()).parseClaimsJws(jwt).getHeader();
             Claims claims = Jwts.parser().setSigningKey(signingKey.getEncoded()).parseClaimsJws(jwt).getBody();
 
             //Let's be sure this jwt is actually an access token otherwise we will have an error when trying to retrieve
             //a resource (in order to delete it) that actually is not what we expect
-            if (isAccessToken(claims)) {
+            if (isAccessToken(header)) {
                 gracefullyDeleteRefreshToken((String) claims.get("rti"));
                 gracefullyDeleteAccessToken(claims.getId());
             }
             //There should never be a refresh token here. Therefore we will not even try to identify if the received JWT is
             //a refresh token. That would be a bug in the filter chain as a refresh token should never be used to anything other than
             //obtaining a new access token
-        }
-        if (log.isDebugEnabled()) {
-            log.debug("The current access and refresh tokens for {} have been revoked.", event.getAccount().getEmail());
+
+            //Fix for https://github.com/stormpath/stormpath-sdk-java/issues/611
+            log.debug(
+                "The current access and refresh tokens for '{}' have been revoked.",
+                (event.getAccount() != null) ? event.getAccount().getEmail() : "unknown user"
+            );
         }
     }
 
-    private boolean isAccessToken(Claims claims) {
-        return claims.containsKey("rti");
+    // addresses https://github.com/stormpath/stormpath-sdk-java/issues/788
+    // ensures that we look both in the Authorization header and in cookies
+    // for an access_token
+    private String getJwtFromLogoutRequestEvent(LogoutRequestEvent event) {
+        String jwt = tokenExtractor.getAccessToken(event.getRequest());
+        if (jwt == null && accessTokenCookieResolver.get(event.getRequest(), null) != null) {
+            jwt = accessTokenCookieResolver.get(event.getRequest(), null).getValue();
+        }
+
+        return jwt;
+    }
+
+    private boolean isAccessToken(JwsHeader header) {
+        return header.get("stt").equals("access");
     }
 
     private void gracefullyDeleteAccessToken(String accessTokenId) {
@@ -110,8 +129,8 @@ public class TokenRevocationRequestEventListener implements RequestEventListener
             AccessToken accessToken = ((InternalDataStore)client.getDataStore()).instantiate(AccessToken.class, map, true);
             accessToken.delete();
         } catch (ResourceException e) {
-            //Let's prevent an error to avoid the flow to continue
-            log.error("There was an error trying to delete access token with ID " + accessTokenId + ". Exception was: " + e.getStackTrace());
+            //Let's prevent an error to allow the flow to continue
+            log.warn("There was an error trying to delete access token with ID {}", accessTokenId, e);
         }
     }
 
@@ -123,9 +142,9 @@ public class TokenRevocationRequestEventListener implements RequestEventListener
             RefreshToken refreshToken = ((InternalDataStore)client.getDataStore()).instantiate(RefreshToken.class, map, true);
             refreshToken.delete();
         } catch (ResourceException e) {
-            //Let's prevent an error to avoid the flow to continue, this component is basically a listener that tries to delete
+            //Let's prevent an error to allow the flow to continue, this component is basically a listener that tries to delete
             //the current access and refresh tokens on logout, we will only post this error in the log
-            log.error("There was an error trying to delete refresh token with ID " + refreshTokenId + ". Exception was: " + e.getStackTrace());
+            log.warn("There was an error trying to delete refresh token with ID {}", refreshTokenId, e);
         }
     }
 }

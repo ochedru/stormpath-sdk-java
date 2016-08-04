@@ -16,7 +16,6 @@
 package com.stormpath.spring.config;
 
 import com.stormpath.sdk.application.Application;
-import com.stormpath.sdk.client.Client;
 import com.stormpath.spring.security.provider.AccountCustomDataPermissionResolver;
 import com.stormpath.spring.security.provider.AccountGrantedAuthorityResolver;
 import com.stormpath.spring.security.provider.AccountPermissionResolver;
@@ -29,15 +28,16 @@ import com.stormpath.spring.security.provider.GroupPermissionResolver;
 import com.stormpath.spring.security.provider.StormpathAuthenticationProvider;
 import com.stormpath.spring.security.provider.UsernamePasswordAuthenticationTokenFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.ProviderManager;
+
+import java.util.Arrays;
 
 /**
  * @since 1.0.RC5
  */
 public abstract class AbstractStormpathSpringSecurityConfiguration {
-
-    @Autowired
-    private Client client;
 
     @Autowired
     private Application application;
@@ -64,11 +64,7 @@ public abstract class AbstractStormpathSpringSecurityConfiguration {
 
     public AuthenticationProvider stormpathAuthenticationProvider() {
 
-        StormpathAuthenticationProvider provider = new StormpathAuthenticationProvider();
-
-        provider.setClient(client);
-        provider.setApplicationRestUrl(application.getHref());
-
+        StormpathAuthenticationProvider provider = new StormpathAuthenticationProvider(application);
         provider.setGroupGrantedAuthorityResolver(stormpathGroupGrantedAuthorityResolver());
         provider.setGroupPermissionResolver(stormpathGroupPermissionResolver());
         provider.setAccountGrantedAuthorityResolver(stormpathAccountGrantedAuthorityResolver());
@@ -78,4 +74,7 @@ public abstract class AbstractStormpathSpringSecurityConfiguration {
         return provider;
     }
 
+    public AuthenticationManager stormpathAuthenticationManager() {
+        return new ProviderManager(Arrays.asList(stormpathAuthenticationProvider()));
+    }
 }

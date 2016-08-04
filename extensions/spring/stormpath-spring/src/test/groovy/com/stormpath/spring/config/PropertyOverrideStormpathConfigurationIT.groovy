@@ -30,7 +30,7 @@ import static org.testng.Assert.*
 /**
  * @since 1.0.RC4
  */
-@ContextConfiguration(classes = PropertyOverrideAppConfig.class)
+@ContextConfiguration(classes = PropertyOverrideTestAppConfig.class)
 class PropertyOverrideStormpathConfigurationIT extends AbstractTestNGSpringContextTests {
 
     @Autowired
@@ -63,7 +63,7 @@ class PropertyOverrideStormpathConfigurationIT extends AbstractTestNGSpringConte
         //assert app href override worked as expected:
         def expected =
             System.getenv("STORMPATH_TEST_APPLICATION_HREF") ?:
-            'https://api.stormpath.com/v1/applications/2RbTfV9wx59glWwChd9NQC'
+            'https://api.stormpath.com/v1/applications/4DeLl67pB8MZGx8xL8PnPd'
         assertEquals application.href, expected
     }
 }

@@ -37,7 +37,8 @@ public class WebAppInitializer implements WebApplicationInitializer {
         context.register(WebAppConfig.class);
         sc.addListener(new ContextLoaderListener(context));
 
-        ServletRegistration.Dynamic dispatcher = sc.addServlet("dispatcher", new DispatcherServlet(context));
+        DispatcherServlet dispatcherServlet = new DispatcherServlet(context);
+        ServletRegistration.Dynamic dispatcher = sc.addServlet("dispatcher", dispatcherServlet);
         dispatcher.setLoadOnStartup(1);
         dispatcher.addMapping("/");
 

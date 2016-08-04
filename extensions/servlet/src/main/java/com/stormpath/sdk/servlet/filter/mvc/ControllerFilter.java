@@ -16,20 +16,24 @@
 package com.stormpath.sdk.servlet.filter.mvc;
 
 import com.stormpath.sdk.lang.Assert;
-import com.stormpath.sdk.lang.Collections;
 import com.stormpath.sdk.servlet.filter.HttpFilter;
+import com.stormpath.sdk.servlet.http.MediaType;
 import com.stormpath.sdk.servlet.mvc.Controller;
+import com.stormpath.sdk.servlet.mvc.DefaultViewResolver;
+import com.stormpath.sdk.servlet.mvc.InternalResourceViewResolver;
+import com.stormpath.sdk.servlet.mvc.JacksonView;
+import com.stormpath.sdk.servlet.mvc.View;
 import com.stormpath.sdk.servlet.mvc.ViewModel;
+import com.stormpath.sdk.servlet.mvc.ViewResolver;
 import com.stormpath.sdk.servlet.util.ServletUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Map;
+import java.util.List;
 
 /**
  * A Servlet Filter that acts as an MVC {@link com.stormpath.sdk.servlet.mvc.Controller Controller} by delegating to an
@@ -45,8 +49,10 @@ public class ControllerFilter extends HttpFilter {
 
     private Controller controller;
 
-    private String prefix = "/WEB-INF/jsp/";
+    private String prefix = "/WEB-INF/jsp/stormpath/";
     private String suffix = ".jsp";
+    private List<MediaType> producedMediaTypes;
+    private ViewResolver viewResolver;
 
     public Controller getController() {
         return controller;
@@ -72,14 +78,33 @@ public class ControllerFilter extends HttpFilter {
         this.suffix = suffix;
     }
 
-    @Override
-    protected void onInit() throws ServletException {
-        Assert.notNull(controller, "Controller instance must be configured.");
+    public List<MediaType> getProducedMediaTypes() {
+        return producedMediaTypes;
+    }
+
+    public void setProducedMediaTypes(List<MediaType> producedMediaTypes) {
+        this.producedMediaTypes = producedMediaTypes;
+    }
+
+    public void setViewResolver(ViewResolver viewResolver) {
+        this.viewResolver = viewResolver;
     }
 
     @Override
-    protected void filter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws Exception {
+    protected void onInit() throws Exception {
+        Assert.notNull(controller, "Controller instance must be configured.");
+        Assert.notEmpty(producedMediaTypes, "producedMediaTypes property cannot be null or empty.");
+
+        if (this.viewResolver == null) {
+            InternalResourceViewResolver irvr = new InternalResourceViewResolver();
+            irvr.setPrefix(getPrefix());
+            irvr.setSuffix(getSuffix());
+            this.viewResolver = new DefaultViewResolver(irvr, new JacksonView(), producedMediaTypes);
+        }
+    }
+
+    @Override
+    protected void filter(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws Exception {
 
         ViewModel vm;
         try {
@@ -95,8 +120,6 @@ public class ControllerFilter extends HttpFilter {
         String viewName = vm.getViewName();
         Assert.hasText(viewName, "ViewModel must contain a viewName.");
 
-        log.debug("Returning view name '{}' for request URI [{}]", viewName, request.getRequestURI());
-
         boolean redirect = vm.isRedirect();
 
         if (redirect) {
@@ -108,36 +131,24 @@ public class ControllerFilter extends HttpFilter {
 
     protected void redirect(HttpServletRequest request, HttpServletResponse response, ViewModel vm) throws IOException {
         String redirectUri = vm.getViewName();
+        log.debug("Redirecting to '{}' for request URI [{}]", redirectUri, request.getRequestURI());
         ServletUtils.issueRedirect(request, response, redirectUri, null, true, true);
     }
 
-    protected void render(HttpServletRequest request, HttpServletResponse response, ViewModel vm)
-        throws ServletException, IOException {
+    protected void render(HttpServletRequest request, HttpServletResponse response, ViewModel vm) throws Exception {
 
-        Map<String, ?> model = vm.getModel();
-        setAttributes(request, model);
+        log.debug("Rendering view '{}' for request URI [{}]", vm.getViewName(), request.getRequestURI());
+        View view = this.viewResolver.getView(vm, request);
 
-        String viewName = vm.getViewName();
-
-        String filePath = toFilePath(viewName);
-
-        request.getRequestDispatcher(filePath).forward(request, response);
-    }
-
-    protected String toFilePath(String viewName) {
-        return getPrefix() + viewName + getSuffix();
-    }
-
-    protected void setAttributes(HttpServletRequest request, Map<String, ?> model) {
-        if (Collections.isEmpty(model)) {
+        if (view == null) {
+            // since the filter method above asserts that view name is always non-null/empty, that implies we always
+            // need a corresponding view instance.  If we don't find one, that's a config error:
+            log.warn("Unable to find view instance for named view '{}' for request URI [{}]",
+                vm.getViewName(), request.getRequestURI());
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
 
-        for (String key : model.keySet()) {
-            Object value = model.get(key);
-            if (value != null) {
-                request.setAttribute(key, value);
-            }
-        }
+        view.render(request, response, vm);
     }
 }

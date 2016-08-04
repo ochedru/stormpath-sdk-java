@@ -19,74 +19,58 @@ import com.stormpath.sdk.account.Account;
 import com.stormpath.sdk.account.AccountStatus;
 import com.stormpath.sdk.application.Application;
 import com.stormpath.sdk.authc.AuthenticationResult;
+import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.idsite.IdSiteCallbackHandler;
 import com.stormpath.sdk.idsite.IdSiteResultListener;
 import com.stormpath.sdk.idsite.LogoutResult;
 import com.stormpath.sdk.idsite.RegistrationResult;
 import com.stormpath.sdk.lang.Assert;
+import com.stormpath.sdk.oauth.AccessToken;
+import com.stormpath.sdk.oauth.AccessTokenResult;
+import com.stormpath.sdk.oauth.Authenticators;
+import com.stormpath.sdk.oauth.IdSiteAuthenticationRequest;
+import com.stormpath.sdk.oauth.OAuthGrantRequestAuthenticationResult;
+import com.stormpath.sdk.oauth.OAuthRequests;
+import com.stormpath.sdk.oauth.RefreshToken;
 import com.stormpath.sdk.servlet.account.event.RegisteredAccountRequestEvent;
 import com.stormpath.sdk.servlet.account.event.impl.DefaultRegisteredAccountRequestEvent;
 import com.stormpath.sdk.servlet.application.ApplicationResolver;
 import com.stormpath.sdk.servlet.authc.impl.TransientAuthenticationResult;
+import com.stormpath.sdk.servlet.client.ClientResolver;
 import com.stormpath.sdk.servlet.event.RequestEvent;
-import com.stormpath.sdk.servlet.event.impl.Publisher;
-import com.stormpath.sdk.servlet.http.Saver;
+import com.stormpath.sdk.servlet.filter.oauth.AccessTokenResultFactory;
+import io.jsonwebtoken.JwtBuilder;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
-public class IdSiteResultController extends AbstractController {
+public class IdSiteResultController extends CallbackController {
 
-    private String registerNextUri;
-    private String loginNextUri;
-
-    private Controller logoutController;
-    private Saver<AuthenticationResult> authenticationResultSaver;
-    private Publisher<RequestEvent> eventPublisher;
-
+    private String registerNextUri = null;
     private List<IdSiteResultListener> idSiteResultListeners = new ArrayList<IdSiteResultListener>();
-
-    public void setRegisterNextUri(String registerNextUri) {
-        this.registerNextUri = registerNextUri;
-    }
-
-    public void setLoginNextUri(String loginNextUri) {
-        this.loginNextUri = loginNextUri;
-    }
-
-    public void setLogoutController(Controller logoutController) {
-        this.logoutController = logoutController;
-    }
-
-    public Publisher<RequestEvent> getEventPublisher() {
-        return eventPublisher;
-    }
-
-    public void setEventPublisher(Publisher<RequestEvent> eventPublisher) {
-        this.eventPublisher = eventPublisher;
-    }
-
-    public Saver<AuthenticationResult> getAuthenticationResultSaver() {
-        return authenticationResultSaver;
-    }
-
-    public void setAuthenticationResultSaver(Saver<AuthenticationResult> authenticationResultSaver) {
-        this.authenticationResultSaver = authenticationResultSaver;
-    }
 
     public void addIdSiteResultListener(IdSiteResultListener resultListener) {
         Assert.notNull(resultListener, "resultListener cannot be null");
         idSiteResultListeners.add(resultListener);
     }
 
-    public void init() {
-        Assert.hasText(registerNextUri, "registerNextUri must be configured.");
-        Assert.hasText(loginNextUri, "loginNextUri must be configured.");
-        Assert.notNull(logoutController, "logoutController must be configured.");
-        Assert.notNull(authenticationResultSaver, "authenticationResultSaver must be configured.");
-        Assert.notNull(eventPublisher, "request event publisher must be configured.");
+    public void doInit() {
+        Assert.notNull(registerNextUri, "registerNextUri must be configured.");
+    }
+
+    public void setRegisterNextUri(String registerNextUri) {
+        this.registerNextUri = registerNextUri;
+    }
+
+    @Override
+    public boolean isNotAllowedIfAuthenticated() {
+        return true;
     }
 
     protected Application getApplication(HttpServletRequest request) {
@@ -103,17 +87,17 @@ public class IdSiteResultController extends AbstractController {
         IdSiteCallbackHandler idSiteCallbackHandler = app.newIdSiteCallbackHandler(request).setResultListener(new IdSiteResultListener() {
             @Override
             public void onRegistered(RegistrationResult result) {
-                viewModel[0] = IdSiteResultController.this.onRegistration(request, response, app, result);
+                viewModel[0] = IdSiteResultController.this.onRegistration(request, response, result);
             }
 
             @Override
             public void onAuthenticated(com.stormpath.sdk.idsite.AuthenticationResult result) {
-                viewModel[0] = IdSiteResultController.this.onAuthentication(request, response, app, result);
+                viewModel[0] = IdSiteResultController.this.onAuthentication(request, response, result);
             }
 
             @Override
             public void onLogout(LogoutResult result) {
-                viewModel[0] = IdSiteResultController.this.onLogout(request, response, app, result);
+                viewModel[0] = IdSiteResultController.this.onLogout(request, response, result);
 
             }
         });
@@ -127,8 +111,7 @@ public class IdSiteResultController extends AbstractController {
         return viewModel[0];
     }
 
-    protected ViewModel onRegistration(final HttpServletRequest request, final HttpServletResponse response,
-                                       Application application, RegistrationResult result) {
+    private ViewModel onRegistration(final HttpServletRequest request, final HttpServletResponse response, RegistrationResult result) {
 
         final Account account = result.getAccount();
 
@@ -149,46 +132,8 @@ public class IdSiteResultController extends AbstractController {
         return new DefaultViewModel(registerNextUri).setRedirect(true);
     }
 
-    protected ViewModel onAuthentication(HttpServletRequest request, HttpServletResponse response,
-                                         Application application,
-                                         com.stormpath.sdk.idsite.AuthenticationResult result) {
-
-        //simulate a result for the benefit of the 'saveResult' method signature:
-        AuthenticationResult authcResult = new TransientAuthenticationResult(result.getAccount());
-        saveResult(request, response, authcResult);
-
-        return new DefaultViewModel(loginNextUri).setRedirect(true);
-    }
-
-    protected ViewModel onLogout(HttpServletRequest request, HttpServletResponse response, Application application,
-                                 LogoutResult result) {
-
-        //let the IdSiteLogoutController know this is a reply from ID site and to not redirect to ID site again:
-        request.setAttribute(LogoutResult.class.getName(), result);
-
-        try {
-            return logoutController.handleRequest(request, response);
-        } catch (Exception e) {
-            String msg = "Unable to successfully handle logout: " + e.getMessage();
-            throw new RuntimeException(msg, e);
-        }
-    }
-
-    protected RegisteredAccountRequestEvent createRegisteredEvent(HttpServletRequest request,
-                                                                  HttpServletResponse response, Account account) {
+    private RegisteredAccountRequestEvent createRegisteredEvent(HttpServletRequest request,
+                                                                HttpServletResponse response, Account account) {
         return new DefaultRegisteredAccountRequestEvent(request, response, account);
-    }
-
-    protected void publish(RequestEvent e) {
-        try {
-            getEventPublisher().publish(e);
-        } catch (Exception ex) {
-            String msg = "Unable to publish registered account request event: " + ex.getMessage();
-            throw new RuntimeException(msg, ex);
-        }
-    }
-
-    protected void saveResult(HttpServletRequest request, HttpServletResponse response, AuthenticationResult result) {
-        getAuthenticationResultSaver().set(request, response, result);
     }
 }

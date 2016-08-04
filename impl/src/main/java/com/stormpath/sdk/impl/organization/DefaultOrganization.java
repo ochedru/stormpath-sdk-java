@@ -159,7 +159,7 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
                 getAccountStoreMappings(); //obtains the href: does not execute a query until iteration occurs
         return getDataStore().getResource(accountStoreMappings.getHref(), OrganizationAccountStoreMappingList.class, queryParams);
     }
-    
+
     @Override
     public AccountStore getDefaultAccountStore() {
         OrganizationAccountStoreMapping accountStoreMap = getResourceProperty(DEFAULT_ACCOUNT_STORE_MAPPING);
@@ -220,8 +220,9 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
         }
     }
 
+    /** @since 1.0.RC9 */
     @Override
-    public OrganizationAccountStoreMapping createOrganizationAccountStoreMapping(OrganizationAccountStoreMapping mapping) throws ResourceException {
+    public OrganizationAccountStoreMapping createAccountStoreMapping(OrganizationAccountStoreMapping mapping) throws ResourceException {
         return getDataStore().create("/organizationAccountStoreMappings", mapping);
     }
 
@@ -232,7 +233,7 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
         accountStoreMapping.setAccountStore(accountStore);
         accountStoreMapping.setOrganization(this);
         accountStoreMapping.setListIndex(Integer.MAX_VALUE);
-        accountStoreMapping = createOrganizationAccountStoreMapping(accountStoreMapping);
+        accountStoreMapping = createAccountStoreMapping(accountStoreMapping);
         return accountStoreMapping;
     }
 

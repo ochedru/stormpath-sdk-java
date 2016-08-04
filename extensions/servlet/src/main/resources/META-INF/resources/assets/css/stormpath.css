@@ -79,53 +79,48 @@ p {
     -ms-filter: "progid:DXImageTransform.Microsoft.gradient (GradientType=0, startColorstr=#2ec700, endColorstr=#43cd1a)";
 }
 
+.btn-saml {
+    color: #fff;
+    background: -webkit-linear-gradient(#458ac5 50%, #3b7db5 50%);
+    background: linear-gradient(#458ac5 50%, #3b7db5 50%);
+    filter: progid: DXImageTransform.Microsoft.gradient(GradientType=0, startColorstr=#3b7db5, endColorstr=#458ac5);
+    -ms-filter: "progid:DXImageTransform.Microsoft.gradient (GradientType=0, startColorstr=#3b7db5, endColorstr=#458ac5)"
+}
+
+.btn-saml:focus,
+.btn-saml:hover {
+    color: #fff;
+    background: -webkit-linear-gradient(#458ac5 50%, #3b7db5 50%);
+    background: linear-gradient(#458ac5 50%, #3b7db5 50%);
+    filter: progid: DXImageTransform.Microsoft.gradient(GradientType=0, startColorstr=#3b7db5, endColorstr=#458ac5);
+    -ms-filter: "progid:DXImageTransform.Microsoft.gradient (GradientType=0, startColorstr=#3b7db5, endColorstr=#458ac5)"
+}
+
 .btn-social {
-    height: 37px;
-    line-height: 18.5px;
-    color: #fff;
-    font-size: 16px;
-    border-radius: 3px;
-}
-
-.btn-social:hover,
-.btn-social:focus {
-    color: #fff;
-}
-
-.btn-facebook {
-    background: -webkit-linear-gradient(#4c6fc5 50%, #3d63c0 50%);
-    background: linear-gradient(#4c6fc5 50%, #3d63c0 50%);
-    filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0, startColorstr=#3d63c0, endColorstr=#4c6fc5);
-    -ms-filter: "progid:DXImageTransform.Microsoft.gradient (GradientType=0, startColorstr=#3d63c0, endColorstr=#4c6fc5)";
-}
-
-.btn-facebook:hover,
-.btn-facebook:focus {
-    color: #fff;
-    background: -webkit-linear-gradient(#4773de 50%, #3767db 50%);
-    background: linear-gradient(#4773de 50%, #3767db 50%);
-    filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0, startColorstr=#3767db, endColorstr=#4773de);
-    -ms-filter: "progid:DXImageTransform.Microsoft.gradient (GradientType=0, startColorstr=#3767db, endColorstr=#4773de)";
-}
-
-.btn-google {
-    background: -webkit-linear-gradient(#e05b4b 50%, #dd4b39 50%);
-    background: linear-gradient(#e05b4b 50%, #dd4b39 50%);
-    filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0, startColorstr=#dd4b39, endColorstr=#e05b4b);
-    -ms-filter: "progid:DXImageTransform.Microsoft.gradient (GradientType=0, startColorstr=#dd4b39, endColorstr=#e05b4b)";
-}
-
-.btn-google:hover,
-.btn-google:focus {
-    color: #fff;
-    background: -webkit-linear-gradient(#ea604e 50%, #e8503c 50%);
-    background: linear-gradient(#ea604e 50%, #e8503c 50%);
-    filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0, startColorstr=#e8503c, endColorstr=#ea604e);
-    -ms-filter: "progid:DXImageTransform.Microsoft.gradient (GradientType=0, startColorstr=#e8503c, endColorstr=#ea604e)";
+    text-transform: capitalize;
 }
 
 .btn-register {
     font-size: 16px;
+}
+
+.login-view .provider-area {
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+    padding: 0 20px;
+    position: relative;
+    padding-bottom: 20px;
+    background-color: #f6f6f6
+}
+
+.login-view .provider-area .header {
+    margin-bottom: -6px
+}
+
+.login-view .provider-area button {
+    display: block;
+    width: 100%;
+    margin-bottom: 15px
 }
 
 .form-control {
@@ -165,7 +160,8 @@ p {
 }
 
 .view input[type="text"],
-.view input[type="password"] {
+.view input[type="password"],
+.view input[type="email"] {
     background-color: #f6f6f6;
     height: 45px;
 }
@@ -208,7 +204,8 @@ p {
 }
 
 .sp-form .has-error input[type="text"],
-.sp-form .has-error input[type="password"] {
+.sp-form .has-error input[type="password"]
+.sp-form .has-error input[type="email"] {
     border-color: #ec3e3e;
 }
 
@@ -266,11 +263,6 @@ p {
     .login-view .email-password-area {
         padding: 0 30px;
     }
-}
-
-.login-view .email-password-area label {
-    height: 14px;
-    line-height: 14px;
 }
 
 .login-view .email-password-area input[type='checkbox'] {

@@ -26,7 +26,15 @@ import com.stormpath.sdk.impl.ds.cache.DefaultCacheResolver;
 import com.stormpath.sdk.impl.ds.cache.ReadCacheFilter;
 import com.stormpath.sdk.impl.ds.cache.WriteCacheFilter;
 import com.stormpath.sdk.impl.error.DefaultError;
-import com.stormpath.sdk.impl.http.*;
+import com.stormpath.sdk.impl.http.CanonicalUri;
+import com.stormpath.sdk.impl.http.HttpHeaders;
+import com.stormpath.sdk.impl.http.HttpHeadersHolder;
+import com.stormpath.sdk.impl.http.MediaType;
+import com.stormpath.sdk.impl.http.QueryString;
+import com.stormpath.sdk.impl.http.QueryStringFactory;
+import com.stormpath.sdk.impl.http.Request;
+import com.stormpath.sdk.impl.http.RequestExecutor;
+import com.stormpath.sdk.impl.http.Response;
 import com.stormpath.sdk.impl.http.support.DefaultCanonicalUri;
 import com.stormpath.sdk.impl.http.support.DefaultRequest;
 import com.stormpath.sdk.impl.http.support.UserAgent;
@@ -51,7 +59,14 @@ import org.slf4j.LoggerFactory;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
+import java.util.TreeMap;
+
+import static com.stormpath.sdk.impl.http.HttpHeaders.STORMPATH_AGENT;
 
 /**
  * @since 0.1
@@ -529,7 +544,15 @@ public class DefaultDataStore implements InternalDataStore {
 
         if (response.isError()) {
             Map<String, Object> body = getBody(response);
+
+            String requestId = response.getHeaders().getStormpathRequestId();
+
+            if (Strings.hasText(requestId)) {
+                body.put(DefaultError.REQUEST_ID.getName(), requestId);
+            }
+
             DefaultError error = new DefaultError(body);
+
             throw new ResourceException(error);
         }
 
@@ -551,8 +574,20 @@ public class DefaultDataStore implements InternalDataStore {
 
     protected void applyDefaultRequestHeaders(Request request) {
         request.getHeaders().setAccept(java.util.Collections.singletonList(MediaType.APPLICATION_JSON));
-        request.getHeaders().set("User-Agent", USER_AGENT_STRING);
-        if (request.getHeaders().getContentType() == null){
+
+        // Get runtime headers from http client
+        Map<String, List<String>> headerMap = HttpHeadersHolder.get();
+        String stormpathAgentHeaderName = STORMPATH_AGENT.toLowerCase();
+        if (headerMap != null && headerMap.get(stormpathAgentHeaderName) != null) {
+            List<String> stormpathAgents = headerMap.get(stormpathAgentHeaderName);
+            if (stormpathAgents != null && stormpathAgents.size() > 0) {
+                String stormpathAgent = Strings.arrayToDelimitedString(stormpathAgents.toArray(), " ");
+                request.getHeaders().set("User-Agent", stormpathAgent + " " + USER_AGENT_STRING);
+            }
+        } else {
+            request.getHeaders().set("User-Agent", USER_AGENT_STRING);
+        }
+        if (request.getHeaders().getContentType() == null) {
             if (request.getBody() != null) {
                 // We only add the default content type (application/json) if a content type is not already in the request
                 request.getHeaders().setContentType(MediaType.APPLICATION_JSON);

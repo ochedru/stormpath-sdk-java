@@ -15,8 +15,31 @@
  */
 package com.stormpath.sdk.servlet.filter;
 
+import com.stormpath.sdk.servlet.config.ConfigSingletonFactory;
+import com.stormpath.sdk.servlet.config.filter.AccessTokenFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.AccountAuthorizationFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.AuthenticationFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.ChangePasswordFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.FacebookCallbackFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.ForgotPasswordFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.GithubCallbackFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.GoogleCallbackFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.IDSiteForgotFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.IDSiteLoginFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.IDSiteRegisterFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.IdSiteLogoutFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.IDSiteResultFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.LinkedInCallbackFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.LoginFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.LogoutFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.MeFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.RegisterFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.SamlFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.SamlResultFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.StaticResourceFilterFactory;
+import com.stormpath.sdk.servlet.config.filter.VerifyFilterFactory;
 import com.stormpath.sdk.servlet.filter.account.AccountAuthorizationFilter;
-import com.stormpath.sdk.servlet.filter.oauth.AccessTokenFilter;
+import com.stormpath.sdk.servlet.filter.mvc.ControllerFilter;
 
 import javax.servlet.Filter;
 
@@ -27,31 +50,50 @@ import javax.servlet.Filter;
  */
 public enum DefaultFilter {
 
-    accessToken(AccessTokenFilter.class),
-    account(AccountAuthorizationFilter.class),
-    anon(AnonymousFilter.class),
-    authc(AuthenticationFilter.class),
-    login(LoginFilter.class),
-    logout(LogoutFilter.class),
-    forgot(ForgotPasswordFilter.class),
-    change(ChangePasswordFilter.class),
-    register(RegisterFilter.class),
-    unauthorized(UnauthorizedFilter.class),
-    verify(VerifyFilter.class),
-    sendVerificationEmail(SendVerificationEmailFilter.class);
+    accessToken(ControllerFilter.class, AccessTokenFilterFactory.class),
+    account(AccountAuthorizationFilter.class, AccountAuthorizationFilterFactory.class),
+    anon(AnonymousFilter.class, null),
+    authc(AuthenticationFilter.class, AuthenticationFilterFactory.class),
+    change(ControllerFilter.class, ChangePasswordFilterFactory.class),
+    facebookCallback(ControllerFilter.class, FacebookCallbackFilterFactory.class),
+    forgot(ControllerFilter.class, ForgotPasswordFilterFactory.class),
+    githubCallback(ControllerFilter.class, GithubCallbackFilterFactory.class),
+    googleCallback(ControllerFilter.class, GoogleCallbackFilterFactory.class),
+    linkedinCallback(ControllerFilter.class, LinkedInCallbackFilterFactory.class),
+    login(ControllerFilter.class, LoginFilterFactory.class),
+    logout(ControllerFilter.class, LogoutFilterFactory.class),
+    me(MeFilter.class, MeFilterFactory.class),
+    register(ControllerFilter.class, RegisterFilterFactory.class),
+    saml(ControllerFilter.class, SamlFilterFactory.class),
+    samlResult(ControllerFilter.class, SamlResultFilterFactory.class),
+    staticResource(StaticResourceFilter.class, StaticResourceFilterFactory.class),
+    unauthorized(UnauthorizedFilter.class, null),
+    verify(ControllerFilter.class, VerifyFilterFactory.class),
+    idSite(ControllerFilter.class, IDSiteLoginFilterFactory.class),
+    idSiteResult(ControllerFilter.class, IDSiteResultFilterFactory.class),
+    idSiteLogout(ControllerFilter.class, IdSiteLogoutFilterFactory.class),
+    idSiteRegister(ControllerFilter.class, IDSiteRegisterFilterFactory.class),
+    idSiteForgot(ControllerFilter.class, IDSiteForgotFilterFactory.class);
 
     private final Class<? extends Filter> filterClass;
 
-    private DefaultFilter(Class<? extends Filter> filterClass) {
+    private final Class<? extends ConfigSingletonFactory<? extends Filter>> factoryClass;
+
+    DefaultFilter(Class<? extends Filter> filterClass, Class<? extends ConfigSingletonFactory<? extends Filter>> factoryClass) {
         this.filterClass = filterClass;
+        this.factoryClass = factoryClass;
     }
 
     public Class<? extends Filter> getFilterClass() {
         return this.filterClass;
     }
 
+    public Class<? extends ConfigSingletonFactory<? extends Filter>> getFactoryClass() {
+        return factoryClass;
+    }
+
     public static DefaultFilter forName(String name) {
-        for(DefaultFilter filter : values()) {
+        for (DefaultFilter filter : values()) {
             if (filter.name().equalsIgnoreCase(name)) {
                 return filter;
             }

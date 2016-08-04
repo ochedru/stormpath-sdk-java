@@ -24,32 +24,37 @@ import javax.servlet.http.HttpServletResponse;
 public class SamlLogoutController extends LogoutController {
 
     private ServerUriResolver serverUriResolver;
-    private String samlResultUri;
-
+    private String resultUri;
     // not implemented yet
-    //private Resolver<SamlOrganizationContext> samlOrganizationResolver;
+    // private Resolver<SamlOrganizationContext> samlOrganizationResolver;
 
     public void setServerUriResolver(ServerUriResolver serverUriResolver) {
         this.serverUriResolver = serverUriResolver;
     }
 
-    public void setSamlResultUri(String samlResultUri) {
-        this.samlResultUri = samlResultUri;
+    public void setResultUri(String resultUri) {
+        this.resultUri = resultUri;
     }
 
-    // not implemented yet
     /*
+    // not implemented yet
     public void setSamlOrganizationResolver(Resolver<SamlOrganizationContext> SamlOrganizationResolver) {
         this.samlOrganizationResolver = samlOrganizationResolver;
     }
     */
 
+    @Override
     public void init() {
-        super.init();
         Assert.notNull(serverUriResolver, "serverUriResolver must be configured.");
-
+        Assert.hasText(resultUri, "resultUri must be configured.");
         //not implemented yet
         //controller.setSamlOrganizationResolver(idSiteOrganizationResolver);
+        super.init();
+    }
+
+    @Override
+    public boolean isNotAllowedIfAuthenticated() {
+        return false;
     }
 
     @Override

@@ -18,19 +18,26 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.stormpath.sdk</groupId>
+    <parent>
+        <groupId>com.stormpath.sdk</groupId>
+        <artifactId>stormpath-sdk-examples</artifactId>
+        <version>1.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
     <artifactId>stormpath-sdk-examples-servlet</artifactId>
-    <version>1.0.RC9-dhatim</version>
+    <version>1.0.1-SNAPSHOT</version>
     <name>Stormpath Java SDK :: Examples :: Servlet Container-based Webapp</name>
     <description>A simple example webapp deployed in a servlet container.</description>
     <packaging>war</packaging>
 
     <properties>
-        <jdk.version>1.6</jdk.version>
+        <jdk.version>1.7</jdk.version>
         <jstl.version>1.2</jstl.version>
-        <logback.version>1.1.2</logback.version>
+        <logback.version>1.1.7</logback.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <servlet.version>3.0.1</servlet.version>
+        <servlet.version>3.1.0</servlet.version>
+        <skipITs>true</skipITs>
     </properties>
 
     <dependencies>
@@ -56,10 +63,42 @@
             <version>${logback.version}</version>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-all</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.jayway.restassured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- JCL is needed by Rest Assured, but we want to use SLF4J's instead: -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jcl-over-slf4j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
     </dependencies>
-
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.codehaus.gmavenplus</groupId>
+                <artifactId>gmavenplus-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -71,25 +110,69 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.eclipse.jetty</groupId>
-                <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.2.2.v20140723</version>
+                <groupId>org.codehaus.cargo</groupId>
+                <artifactId>cargo-maven2-plugin</artifactId>
+                <version>1.4.18</version>
                 <configuration>
-                    <scanIntervalSeconds>10</scanIntervalSeconds>
-                    <webApp>
-                        <contextPath>/</contextPath>
-                    </webApp>
+                    <skip>${skipITs}</skip>
+                    <container>
+                        <containerId>tomcat7x</containerId>
+                        <zipUrlInstaller>
+                            <url>
+                                http://repo1.maven.org/maven2/org/apache/tomcat/tomcat/7.0.69/tomcat-7.0.69.zip
+                            </url>
+                        </zipUrlInstaller>
+                    </container>
+                    <deployables>
+                        <deployable>
+                            <groupId>com.stormpath.sdk</groupId>
+                            <artifactId>stormpath-sdk-examples-servlet</artifactId>
+                            <properties>
+                                <context>/</context>
+                            </properties>
+                        </deployable>
+                    </deployables>
+                    <configuration>
+                        <properties>
+                            <cargo.tomcat.ajp.port>8010</cargo.tomcat.ajp.port>
+                        </properties>
+                    </configuration>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>start-server</id>
+                        <phase>pre-integration-test</phase>
+                        <goals>
+                            <goal>start</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>stop-server</id>
+                        <phase>post-integration-test</phase>
+                        <goals>
+                            <goal>stop</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.tomcat.maven</groupId>
+                <artifactId>tomcat7-maven-plugin</artifactId>
+                <version>2.2</version>
+                <configuration>
+                    <path>/</path>
+                    <server>
+                        <port>11079</port>
+                        <shutdown>STOP</shutdown>
+                        <autoDeploy>true</autoDeploy>
+                        <backgroundProcessorDelay>10</backgroundProcessorDelay>
+                    </server>
                 </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-deploy-plugin</artifactId>
-                <version>2.7</version>
-                <configuration>
-                    <skip>true</skip>
-                </configuration>
             </plugin>
         </plugins>
     </build>
-
 </project>

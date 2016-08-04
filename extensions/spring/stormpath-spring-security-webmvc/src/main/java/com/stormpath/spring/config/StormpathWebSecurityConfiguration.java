@@ -18,10 +18,11 @@ package com.stormpath.spring.config;
 import com.stormpath.sdk.idsite.IdSiteResultListener;
 import com.stormpath.sdk.servlet.csrf.CsrfTokenManager;
 import com.stormpath.sdk.servlet.mvc.ErrorModelFactory;
-import com.stormpath.spring.oauth.Oauth2AuthenticationSpringSecurityProcessingFilter;
 import com.stormpath.spring.filter.SpringSecurityResolvedAccountFilter;
+import com.stormpath.spring.oauth.OAuthAuthenticationSpringSecurityProcessingFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
@@ -81,14 +82,20 @@ public class StormpathWebSecurityConfiguration extends AbstractStormpathWebSecur
 
     @Bean
     @Override
-    public Oauth2AuthenticationSpringSecurityProcessingFilter oAuth2AuthenticationProcessingFilter() {
-        return super.oAuth2AuthenticationProcessingFilter();
+    public OAuthAuthenticationSpringSecurityProcessingFilter oAuthAuthenticationProcessingFilter() {
+        return super.oAuthAuthenticationProcessingFilter();
     }
 
     @Bean
     @Override
     public SpringSecurityResolvedAccountFilter springSecurityResolvedAccountFilter() {
         return super.springSecurityResolvedAccountFilter();
+    }
+
+    @Bean
+    @Override
+    public AuthenticationEntryPoint stormpathAuthenticationEntryPoint() {
+        return super.stormpathAuthenticationEntryPoint();
     }
 
 }

@@ -20,6 +20,8 @@ import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.lang.Strings;
 import com.stormpath.sdk.servlet.authz.RequestAuthorizer;
 import com.stormpath.sdk.servlet.http.Resolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -35,6 +37,10 @@ public class DefaultAccessTokenRequestAuthorizer implements RequestAuthorizer {
 
     private final Resolver<Boolean> secureConnectionRequired;
     private final RequestAuthorizer originAuthorizer;
+
+    private static final Logger log = LoggerFactory.getLogger(DefaultAccessTokenRequestAuthorizer.class);
+
+    private boolean secureWarned;
 
     public DefaultAccessTokenRequestAuthorizer(Resolver<Boolean> secureConnectionRequired, RequestAuthorizer originAuthorizer) {
         Assert.notNull(secureConnectionRequired, "secure resolver cannot be null.");
@@ -52,27 +58,26 @@ public class DefaultAccessTokenRequestAuthorizer implements RequestAuthorizer {
     }
 
     @Override
-    public void assertAuthorized(HttpServletRequest request, HttpServletResponse response) throws OauthException {
-
+    public void assertAuthorized(HttpServletRequest request, HttpServletResponse response) throws OAuthException {
 
         //POST is required: https://tools.ietf.org/html/rfc6749#section-3.2
         if (!HttpMethod.POST.name().equalsIgnoreCase(request.getMethod())) {
             String msg = "HTTP POST is required.";
-            throw new OauthException(OauthErrorCode.INVALID_REQUEST, msg, null);
+            throw new OAuthException(OAuthErrorCode.INVALID_REQUEST, msg, null);
         }
 
         //Form media type is required: https://tools.ietf.org/html/rfc6749#section-4.3.2
         String contentType = Strings.clean(request.getContentType());
         if (contentType == null || !contentType.startsWith(FORM_MEDIA_TYPE)) {
             String msg = "Content-Type must be " + FORM_MEDIA_TYPE;
-            throw new OauthException(OauthErrorCode.INVALID_REQUEST, msg, null);
+            throw new OAuthException(OAuthErrorCode.INVALID_REQUEST, msg, null);
         }
 
         //grant_type is always required for all token requests:
         String grantType = Strings.clean(request.getParameter(GRANT_TYPE_PARAM_NAME));
         if (grantType == null) {
             String msg = "Missing grant_type value.";
-            throw new OauthException(OauthErrorCode.INVALID_REQUEST, msg, null);
+            throw new OAuthException(OAuthErrorCode.INVALID_REQUEST, msg, null);
         }
 
         //Secure connections are required: https://tools.ietf.org/html/rfc6749#section-3.2
@@ -85,7 +90,7 @@ public class DefaultAccessTokenRequestAuthorizer implements RequestAuthorizer {
 
     /**
      * Asserts that the OAuth token request is secure as mandated by <a href="https://tools.ietf.org/html/rfc6749#section-3.2">https://tools.ietf.org/html/rfc6749#section-3.2</a>,
-     * and if not, throws an appropriate {@link com.stormpath.sdk.servlet.filter.oauth.OauthException OauthException}.
+     * and if not, throws an appropriate {@link OAuthException OAuthException}.
      *
      * <p>This implementation delegates to {@link #isSecureConnectionRequired(javax.servlet.http.HttpServletRequest,
      * javax.servlet.http.HttpServletResponse) isSecureConnectionRequired(request,response)}, and if not secure, throws
@@ -93,13 +98,32 @@ public class DefaultAccessTokenRequestAuthorizer implements RequestAuthorizer {
      *
      * @param request  inbound request
      * @param response outbound response
-     * @throws com.stormpath.sdk.servlet.filter.oauth.OauthException if the request is not secure.
+     * @throws OAuthException if the request is not secure.
      */
-    protected void assertSecure(HttpServletRequest request, HttpServletResponse response) throws OauthException {
-        if (isSecureConnectionRequired(request, response) && !request.isSecure()) {
-            String msg = "A secure HTTPS connection is required for token requests - this is " +
-                         "a requirement of the OAuth 2 specification.";
-            throw new OauthException(OauthErrorCode.INVALID_REQUEST, msg, null);
+    protected void assertSecure(HttpServletRequest request, HttpServletResponse response) throws OAuthException {
+
+        boolean secure = request.isSecure();
+        boolean secureRequired = isSecureConnectionRequired(request, response);
+
+        if (!secure) {
+            if (secureRequired) {
+                String msg = "A secure HTTPS connection is required for token requests - this is " +
+                        "a requirement of the OAuth 2 specification.";
+                throw new OAuthException(OAuthErrorCode.INVALID_REQUEST, msg, null);
+            } else {
+                // Added to address https://github.com/stormpath/stormpath-sdk-java/issues/409
+                if (!secureWarned) {
+                    secureWarned = true;
+                    String msg = "The OAuth 2 specification requires secure HTTPS connections during token " +
+                            "requests, but the current configuration allows insecure requests.  The Stormpath SDK " +
+                            "default configuration allows insecure requests for convenience during localhost " +
+                            "development, but CAUTION: it will automatically throw an OAuthException in production " +
+                            "instead of logging this warning (where production is defined as !localhost by default). " +
+                            "When you deploy your application to staging and production environments, ensure that " +
+                            "HTTPS is always enabled otherwise token requests are not likely to function correctly.";
+                    log.warn(msg);
+                }
+            }
         }
     }
 
@@ -107,7 +131,7 @@ public class DefaultAccessTokenRequestAuthorizer implements RequestAuthorizer {
         return getSecureConnectionRequired().get(request, response);
     }
 
-    protected void assertOriginAuthorized(HttpServletRequest request, HttpServletResponse response) throws OauthException {
+    protected void assertOriginAuthorized(HttpServletRequest request, HttpServletResponse response) throws OAuthException {
         getOriginAuthorizer().assertAuthorized(request, response);
     }
 

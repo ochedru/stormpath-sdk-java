@@ -15,17 +15,20 @@
  */
 package com.stormpath.spring.config;
 
+import com.stormpath.sdk.application.Application;
 import com.stormpath.sdk.authc.AuthenticationResult;
 import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.idsite.IdSiteResultListener;
 import com.stormpath.sdk.saml.SamlResultListener;
 import com.stormpath.sdk.servlet.csrf.CsrfTokenManager;
 import com.stormpath.sdk.servlet.csrf.DisabledCsrfTokenManager;
+import com.stormpath.sdk.servlet.event.RequestEvent;
+import com.stormpath.sdk.servlet.event.impl.Publisher;
 import com.stormpath.sdk.servlet.http.Saver;
 import com.stormpath.sdk.servlet.mvc.ErrorModelFactory;
 import com.stormpath.spring.csrf.SpringSecurityCsrfTokenManager;
 import com.stormpath.spring.filter.SpringSecurityResolvedAccountFilter;
-import com.stormpath.spring.oauth.Oauth2AuthenticationSpringSecurityProcessingFilter;
+import com.stormpath.spring.oauth.OAuthAuthenticationSpringSecurityProcessingFilter;
 import com.stormpath.spring.security.provider.SpringSecurityIdSiteResultListener;
 import com.stormpath.spring.security.provider.SpringSecuritySamlResultListener;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,12 +36,13 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
-import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.savedrequest.NullRequestCache;
 
 
 /**
@@ -51,15 +55,25 @@ public abstract class AbstractStormpathWebSecurityConfiguration {
     protected Client client;
 
     @Autowired
+    protected Application application;
+
+    @Autowired
     @Qualifier("stormpathAuthenticationProvider")
     protected AuthenticationProvider stormpathAuthenticationProvider; //provided by stormpath-spring-security
 
-    @Autowired(required = false) //required = false when stormpath.web.enabled = false
+    @Autowired
     @Qualifier("stormpathAuthenticationResultSaver")
     protected Saver<AuthenticationResult> authenticationResultSaver; //provided by stormpath-spring-webmvc
 
+    @Autowired
+    @Qualifier("stormpathRequestEventPublisher")
+    private Publisher<RequestEvent> stormpathRequestEventPublisher; //provided by stormpath-spring-webmvc
+
     @Value("#{ @environment['stormpath.web.login.uri'] ?: '/login' }")
     protected String loginUri;
+
+    @Value("#{ @environment['stormpath.web.me.uri'] ?: '/me' }")
+    protected String meUri;
 
     @Value("#{ @environment['stormpath.web.login.nextUri'] ?: '/' }")
     protected String loginNextUri;
@@ -70,24 +84,31 @@ public abstract class AbstractStormpathWebSecurityConfiguration {
     @Value("#{ @environment['stormpath.web.csrf.token.enabled'] ?: true }")
     protected boolean csrfTokenEnabled;
 
-    @Value("#{ @environment['stormpath.web.accessToken.enabled'] ?: true }")
+    @Value("#{ @environment['stormpath.web.oauth2.enabled'] ?: true }")
     protected boolean accessTokenEnabled;
+
+    @Value("#{ @environment['stormpath.web.produces'] ?: 'application/json, text/html' }")
+    protected String produces;
 
     public StormpathWebSecurityConfigurer stormpathWebSecurityConfigurer() {
         return new StormpathWebSecurityConfigurer();
     }
 
     public AuthenticationSuccessHandler stormpathAuthenticationSuccessHandler() {
-        StormpathLoginSuccessHandler loginSuccessHandler = new StormpathLoginSuccessHandler(client, authenticationResultSaver);
+        StormpathLoginSuccessHandler loginSuccessHandler =
+            new StormpathLoginSuccessHandler(client, authenticationResultSaver, produces);
         loginSuccessHandler.setDefaultTargetUrl(loginNextUri);
+        loginSuccessHandler.setTargetUrlParameter("next");
+        loginSuccessHandler.setRequestCache(new NullRequestCache());
         return loginSuccessHandler;
     }
 
     public AuthenticationFailureHandler stormpathAuthenticationFailureHandler() {
         String loginFailureUri = loginUri + "?error";
-        SimpleUrlAuthenticationFailureHandler handler = new SimpleUrlAuthenticationFailureHandler(loginFailureUri);
-        handler.setAllowSessionCreation(false); //not necessary
-        return handler;
+        return new StormpathAuthenticationFailureHandler(
+            loginFailureUri, stormpathRequestEventPublisher,
+            stormpathLoginErrorModelFactory(), produces
+        );
     }
 
     public ErrorModelFactory stormpathLoginErrorModelFactory() {
@@ -122,14 +143,17 @@ public abstract class AbstractStormpathWebSecurityConfiguration {
 
     }
 
-    public Oauth2AuthenticationSpringSecurityProcessingFilter oAuth2AuthenticationProcessingFilter() {
-        Oauth2AuthenticationSpringSecurityProcessingFilter fitler = new Oauth2AuthenticationSpringSecurityProcessingFilter();
-        fitler.setEnabled(accessTokenEnabled);
-        return fitler;
+    public OAuthAuthenticationSpringSecurityProcessingFilter oAuthAuthenticationProcessingFilter() {
+        OAuthAuthenticationSpringSecurityProcessingFilter filter = new OAuthAuthenticationSpringSecurityProcessingFilter();
+        filter.setEnabled(accessTokenEnabled);
+        return filter;
     }
 
     public SpringSecurityResolvedAccountFilter springSecurityResolvedAccountFilter() {
         return new SpringSecurityResolvedAccountFilter();
     }
 
+    public AuthenticationEntryPoint stormpathAuthenticationEntryPoint() {
+        return new StormpathAuthenticationEntryPoint(loginUri, produces, meUri, application.getName());
+    }
 }

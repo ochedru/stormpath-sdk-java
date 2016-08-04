@@ -18,22 +18,29 @@
 
     <modelVersion>4.0.0</modelVersion>
 
+    <parent>
+        <groupId>com.stormpath.sdk</groupId>
+        <artifactId>stormpath-sdk-examples</artifactId>
+        <version>1.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
     <groupId>com.stormpath.spring</groupId>
     <artifactId>stormpath-sdk-examples-spring-webmvc</artifactId>
-    <version>1.0.RC9-dhatim</version>
+    <version>1.0.1-SNAPSHOT</version>
 
     <name>Stormpath Java SDK :: Examples :: Spring Web MVC</name>
     <description>A Spring Boot web application that uses Stormpath and Spring Security</description>
     <packaging>war</packaging>
 
     <properties>
-        <jdk.version>1.6</jdk.version>
+        <jdk.version>1.7</jdk.version>
         <jstl.version>1.2</jstl.version>
-        <logback.version>1.1.2</logback.version>
+        <logback.version>1.1.7</logback.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <servlet.version>3.0.1</servlet.version>
-        <slf4j.version>1.7.8</slf4j.version>
-        <spring.version>4.2.3.RELEASE</spring.version>
+        <servlet.version>3.1.0</servlet.version>
+        <slf4j.version>1.7.21</slf4j.version>
+        <spring.version>4.3.2.RELEASE</spring.version>
     </properties>
 
     <dependencies>
@@ -103,23 +110,21 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.eclipse.jetty</groupId>
-                <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.2.2.v20140723</version>
+                <groupId>org.apache.tomcat.maven</groupId>
+                <artifactId>tomcat7-maven-plugin</artifactId>
+                <version>2.2</version>
                 <configuration>
-                    <scanIntervalSeconds>10</scanIntervalSeconds>
-                    <webApp>
-                        <contextPath>/</contextPath>
-                    </webApp>
+                    <path>/</path>
+                    <server>
+                        <autoDeploy>true</autoDeploy>
+                        <backgroundProcessorDelay>10</backgroundProcessorDelay>
+                    </server>
                 </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-deploy-plugin</artifactId>
                 <version>2.7</version>
-                <configuration>
-                    <skip>true</skip>
-                </configuration>
             </plugin>
         </plugins>
     </build>

@@ -16,6 +16,7 @@
 package com.stormpath.spring.mvc;
 
 import com.stormpath.sdk.lang.Strings;
+import com.stormpath.sdk.servlet.mvc.Controller;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
@@ -26,6 +27,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.stormpath.sdk.servlet.mvc.View.STORMPATH_JSON_VIEW_NAME;
 
 /**
  * @since 1.0.RC4
@@ -69,16 +72,26 @@ public class TemplateLayoutInterceptor extends HandlerInterceptorAdapter impleme
         Assert.hasText(headViewName, "headViewName must be specified.");
     }
 
-    @Override
-    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
-                           ModelAndView modelAndView) throws Exception {
+    protected boolean shouldExecute(HttpServletRequest request, HttpServletResponse response,
+                                    Object handler, ModelAndView modelAndView) {
 
-        if (modelAndView == null || !modelAndView.isReference()) {
-            return;
+        if (modelAndView == null || !modelAndView.isReference() || STORMPATH_JSON_VIEW_NAME.equals(modelAndView.getViewName())) {
+            return false;
         }
 
         String viewName = modelAndView.getViewName();
         if (isRedirectOrForward(viewName)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
+                           ModelAndView modelAndView) throws Exception {
+
+        if (!shouldExecute(request, response, handler, modelAndView)) {
             return;
         }
 

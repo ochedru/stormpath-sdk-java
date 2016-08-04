@@ -17,19 +17,18 @@ package com.stormpath.spring.boot.autoconfigure
 
 import com.stormpath.sdk.application.Application
 import com.stormpath.sdk.client.Client
-import com.stormpath.spring.config.TwoAppTenantStormpathConfiguration
+import com.stormpath.spring.config.TwoAppTenantStormpathTestConfiguration
 import com.stormpath.spring.security.provider.*
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.SpringApplicationConfiguration
+import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.testng.AbstractTestNGSpringContextTests
 import org.testng.annotations.Test
 
 import static org.testng.Assert.*
-
 /**
  * @since 1.0.RC5
  */
-@SpringApplicationConfiguration(classes = [SpringSecurityBootTestApplication.class, TwoAppTenantStormpathConfiguration.class])
+@SpringBootTest(classes = [SpringSecurityBootTestApplication.class, TwoAppTenantStormpathTestConfiguration.class])
 class StormpathSpringSecurityAutoConfigurationIT extends AbstractTestNGSpringContextTests {
 
     @Autowired
@@ -60,8 +59,7 @@ class StormpathSpringSecurityAutoConfigurationIT extends AbstractTestNGSpringCon
     void test() {
 
         assertNotNull authenticationProvider
-        assertEquals authenticationProvider.applicationRestUrl, application.href
-        assertSame authenticationProvider.client, client
+        assertEquals authenticationProvider.application, application
 
         assertTrue groupGrantedAuthorityResolver instanceof DefaultGroupGrantedAuthorityResolver
         assertTrue groupPermissionResolver instanceof GroupCustomDataPermissionResolver

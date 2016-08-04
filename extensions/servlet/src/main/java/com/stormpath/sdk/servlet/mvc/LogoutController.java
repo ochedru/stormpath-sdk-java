@@ -16,9 +16,6 @@
 package com.stormpath.sdk.servlet.mvc;
 
 import com.stormpath.sdk.lang.Assert;
-import com.stormpath.sdk.lang.Strings;
-import com.stormpath.sdk.servlet.http.UserAgent;
-import com.stormpath.sdk.servlet.http.impl.DefaultUserAgent;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -29,17 +26,7 @@ import javax.servlet.http.HttpSession;
  */
 public class LogoutController extends AbstractController {
 
-    private String nextUri;
-
     private boolean invalidateHttpSession = true;
-
-    public String getNextUri() {
-        return nextUri;
-    }
-
-    public void setNextUri(String nextUri) {
-        this.nextUri = nextUri;
-    }
 
     public boolean isInvalidateHttpSession() {
         return invalidateHttpSession;
@@ -50,12 +37,33 @@ public class LogoutController extends AbstractController {
     }
 
     public void init() {
-        Assert.hasText(nextUri, "nextUri property cannot be null or empty.");
+        Assert.hasText(nextUri, "nextUri must be configured.");
+        Assert.notNull(produces, "produces cannot be null.");
     }
 
     @Override
-    public ViewModel handleRequest(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    public boolean isNotAllowedIfAuthenticated() {
+        return false;
+    }
 
+    @Override
+    protected ViewModel doGet(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        //This Logout Controller does not respond to GET requests (only POST) but
+        //IDSIte Logout is a GET request, therefore we need to respond to it.
+        if (request.getAttribute("idSiteResult.FILTERED") != null) {
+            return processRequest(request, response);
+        }
+        response.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+        return null;
+    }
+
+    @Override
+    protected ViewModel doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        return processRequest(request, response);
+
+    }
+
+    protected ViewModel processRequest(HttpServletRequest request, HttpServletResponse response) throws Exception {
         //clear out any authentication/account state:
         request.logout();
 
@@ -65,27 +73,12 @@ public class LogoutController extends AbstractController {
             session.invalidate();
         }
 
-        String next = request.getParameter("next");
-
-        if (!Strings.hasText(next)) {
-            next = getNextUri();
-        }
-
-        if (isHtmlPreferred(request)) {
-            return new DefaultViewModel(next).setRedirect(true);
+        if (isHtmlPreferred(request, response)) {
+            return new DefaultViewModel(nextUri).setRedirect(true);
         } else {
             //probably an ajax or non-browser client - return 200 ok:
             response.setStatus(HttpServletResponse.SC_OK);
             return null;
         }
-    }
-
-    protected boolean isHtmlPreferred(HttpServletRequest request) {
-        UserAgent ua = getUserAgent(request);
-        return ua.isHtmlPreferred();
-    }
-
-    protected UserAgent getUserAgent(HttpServletRequest request) {
-        return new DefaultUserAgent(request);
     }
 }

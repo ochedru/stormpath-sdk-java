@@ -28,30 +28,33 @@ import com.stormpath.sdk.application.Application
 import com.stormpath.sdk.application.ApplicationAccountStoreMapping
 import com.stormpath.sdk.application.ApplicationAccountStoreMappingList
 import com.stormpath.sdk.application.Applications
-import com.stormpath.sdk.directory.AccountStore
-import com.stormpath.sdk.oauth.AccessToken
-import com.stormpath.sdk.oauth.Authenticators
-import com.stormpath.sdk.oauth.JwtAuthenticationResult
-import com.stormpath.sdk.oauth.Oauth2Requests
-import com.stormpath.sdk.oauth.JwtAuthenticationRequest
-import com.stormpath.sdk.oauth.OauthPolicy
-import com.stormpath.sdk.oauth.PasswordGrantRequest
-import com.stormpath.sdk.oauth.RefreshGrantRequest
-import com.stormpath.sdk.authc.UsernamePasswordRequest
+import com.stormpath.sdk.authc.UsernamePasswordRequests
 import com.stormpath.sdk.client.AuthenticationScheme
 import com.stormpath.sdk.client.Client
 import com.stormpath.sdk.client.ClientIT
+import com.stormpath.sdk.directory.AccountStore
 import com.stormpath.sdk.directory.Directories
 import com.stormpath.sdk.directory.Directory
 import com.stormpath.sdk.group.Group
 import com.stormpath.sdk.group.Groups
+import com.stormpath.sdk.http.HttpMethod
 import com.stormpath.sdk.impl.api.ApiKeyParameter
 import com.stormpath.sdk.impl.client.RequestCountingClient
 import com.stormpath.sdk.impl.ds.DefaultDataStore
 import com.stormpath.sdk.impl.http.authc.SAuthc1RequestAuthenticator
+import com.stormpath.sdk.impl.idsite.IdSiteClaims
 import com.stormpath.sdk.impl.resource.AbstractResource
+import com.stormpath.sdk.impl.saml.SamlResultStatus
 import com.stormpath.sdk.impl.security.ApiKeySecretEncryptionService
 import com.stormpath.sdk.mail.EmailStatus
+import com.stormpath.sdk.oauth.AccessToken
+import com.stormpath.sdk.oauth.Authenticators
+import com.stormpath.sdk.oauth.OAuthBearerRequestAuthentication
+import com.stormpath.sdk.oauth.OAuthBearerRequestAuthenticationResult
+import com.stormpath.sdk.oauth.OAuthRequests
+import com.stormpath.sdk.oauth.OAuthPolicy
+import com.stormpath.sdk.oauth.OAuthPasswordGrantRequestAuthentication
+import com.stormpath.sdk.oauth.OAuthRefreshTokenRequestAuthentication
 import com.stormpath.sdk.organization.Organization
 import com.stormpath.sdk.organization.OrganizationStatus
 import com.stormpath.sdk.organization.Organizations
@@ -62,14 +65,29 @@ import com.stormpath.sdk.resource.ResourceException
 import com.stormpath.sdk.saml.SamlPolicy
 import com.stormpath.sdk.saml.SamlServiceProvider
 import com.stormpath.sdk.tenant.Tenant
+import io.jsonwebtoken.Claims
+import io.jsonwebtoken.Jws
+import io.jsonwebtoken.JwsHeader
+import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.SignatureAlgorithm
 import org.apache.commons.codec.binary.Base64
+import org.testng.Assert
 import org.testng.annotations.Test
 
+import javax.servlet.http.HttpServletRequest
 import java.lang.reflect.Field
 
 import static com.stormpath.sdk.application.Applications.newCreateRequestFor
-import static org.testng.Assert.*
+import static org.easymock.EasyMock.createMock
+import static org.easymock.EasyMock.expect
+import static org.easymock.EasyMock.replay
+import static org.testng.Assert.assertEquals
+import static org.testng.Assert.assertFalse
+import static org.testng.Assert.assertNotEquals
+import static org.testng.Assert.assertNotNull
+import static org.testng.Assert.assertNull
+import static org.testng.Assert.assertTrue
+import static org.testng.Assert.fail
 
 class ApplicationIT extends ClientIT {
 
@@ -98,7 +116,7 @@ class ApplicationIT extends ClientIT {
         acct.surname = 'Smith'
         acct = app.createAccount(Accounts.newCreateRequestFor(acct).setRegistrationWorkflowEnabled(false).build())
 
-        def request = new UsernamePasswordRequest(username, password)
+        def request = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password).build()
         def result = app.authenticateAccount(request)
 
         def cachedAccount = result.getAccount()
@@ -116,7 +134,7 @@ class ApplicationIT extends ClientIT {
         Account account = client.instantiate(Account)
         account.givenName = 'John'
         account.surname = 'DELETEME'
-        account.email =  email
+        account.email = email
         account.password = 'Changeme1!'
 
         def created = app.createAccount(account)
@@ -312,21 +330,25 @@ class ApplicationIT extends ClientIT {
         deleteOnTeardown(acct)
 
         //Account belongs to dir1, therefore login must succeed
-        def request = new UsernamePasswordRequest(username, password, accountStoreMapping1.getAccountStore())
+        def request = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password)
+                .inAccountStore(accountStoreMapping1.getAccountStore()).build()
         def result = app.authenticateAccount(request)
         assertEquals(result.getAccount().getUsername(), acct.username)
 
         try {
             //Account does not belong to dir2, therefore login must fail
-            request = new UsernamePasswordRequest(username, password, accountStoreMapping2.getAccountStore())
+            request = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password)
+                    .inAccountStore(accountStoreMapping2.getAccountStore()).build()
             app.authenticateAccount(request)
             fail("Should have thrown due to invalid username/password");
-        } catch (Exception e) {
-            assertEquals(e.getMessage(), "HTTP 400, Stormpath 7104 (http://docs.stormpath.com/errors/7104): Login attempt failed because there is no Account in the Application's associated Account Stores with the specified username or email.")
+        } catch (com.stormpath.sdk.resource.ResourceException e) {
+            assertEquals(e.getStatus(), 400)
+            assertEquals(e.getCode(), 7104)
+            assertTrue(e.getDeveloperMessage().contains("Login attempt failed because there is no Account in the Application's associated Account Stores with the specified username or email."))
         }
 
         //No account store has been defined, therefore login must succeed
-        request = new UsernamePasswordRequest(username, password)
+        request = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password).build()
         result = app.authenticateAccount(request)
         assertEquals(result.getAccount().getUsername(), acct.username)
     }
@@ -349,7 +371,7 @@ class ApplicationIT extends ClientIT {
         Organization org = client.instantiate(Organization)
         org.setName(uniquify("JSDK_testLoginWithOrganizationAccountStore"))
                 .setDescription("Organization Description")
-                .setNameKey(uniquify("test").substring(2, 8))
+                .setNameKey(uniquify("test"))
                 .setStatus(OrganizationStatus.ENABLED)
         org = client.createOrganization(org)
         deleteOnTeardown(org)
@@ -378,12 +400,12 @@ class ApplicationIT extends ClientIT {
         deleteOnTeardown(accountStoreMapping)
 
         //Account belongs to org, therefore login must succeed
-        def request = new UsernamePasswordRequest(username, password, org)
+        def request = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password).inAccountStore(org).build()
         def result = app.authenticateAccount(request)
         assertEquals(result.getAccount().getUsername(), acct.username)
 
         //No account store has been defined, therefore login must succeed
-        request = new UsernamePasswordRequest(username, password)
+        request = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password).build()
         result = app.authenticateAccount(request)
         assertEquals(result.getAccount().getUsername(), acct.username)
 
@@ -397,11 +419,13 @@ class ApplicationIT extends ClientIT {
 
         //Account does not belong to org2, therefore login must fail
         try {
-            request = new UsernamePasswordRequest(username, password, org2)
+            request = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password).inAccountStore(org2).build()
             result = app.authenticateAccount(request)
             fail("Should have thrown due to invalid username/password");
-        } catch (Exception e) {
-            assertEquals(e.getMessage(), "HTTP 400, Stormpath 5114 (http://docs.stormpath.com/errors/5114): The specified application account store reference is invalid: the specified account store is not one of the application's assigned account stores.")
+        } catch (com.stormpath.sdk.resource.ResourceException e) {
+            assertEquals(e.getStatus(), 400)
+            assertEquals(e.getCode(), 5114)
+            assertTrue(e.getDeveloperMessage().contains("The specified Account Store is not one of the Application's assigned Account Stores."))
         }
     }
 
@@ -439,7 +463,7 @@ class ApplicationIT extends ClientIT {
         Organization org = client.instantiate(Organization)
         org.setName(name)
                 .setDescription("Organization")
-                .setNameKey(uniquify("test").substring(2, 8))
+                .setNameKey(uniquify("test"))
                 .setStatus(OrganizationStatus.ENABLED)
         org = client.currentTenant.createOrganization(org)
         deleteOnTeardown(org)
@@ -452,7 +476,9 @@ class ApplicationIT extends ClientIT {
 
         for (ApplicationAccountStoreMapping mapping : accountStoreMappings) {
             AccountStore accountStore = mapping.getAccountStore();
-            if (!(accountStore instanceof Organization)) { continue; }
+            if (!(accountStore instanceof Organization)) {
+                continue;
+            }
             Organization organization = (Organization) accountStore;
             assertNotNull organization.href
             assertEquals organization.name, name
@@ -513,9 +539,7 @@ class ApplicationIT extends ClientIT {
         } catch (com.stormpath.sdk.resource.ResourceException e) {
             assertEquals(e.getStatus(), 400)
             assertEquals(e.getCode(), 7200)
-            assertEquals(e.getDeveloperMessage(), "Stormpath was not able to complete the request to Google: this can be " +
-                    "caused by either a bad Google directory configuration, or the provided account credentials are not " +
-                    "valid. Google error message: 400 Bad Request")
+            assertTrue(e.getDeveloperMessage().contains("Stormpath was not able to complete the request to Google: this can be caused by either a bad Google Directory configuration, or the provided Account credentials are not valid."))
         }
     }
 
@@ -613,10 +637,37 @@ class ApplicationIT extends ClientIT {
     }
 
     /**
+     * @see https://github.com/stormpath/stormpath-sdk-java/issues/164
+     *
+     * @since 1.0.RC9
+     */
+    @Test
+    void testExpansionNotWorkingBecauseOfCache() {
+
+        //Setup 1 application with 2 accounts
+        def app = createTempApp()
+
+        2.times {
+            def account = createTestAccount(client, app)
+            deleteOnTeardown(account)
+        }
+
+        //Get application without expanding the accounts attribute
+        def appWithoutAccounts = client.getApplications(Applications.where(Applications.name().eqIgnoreCase(app.name))).first()
+        assertNull getValue(AbstractResource, appWithoutAccounts, "properties").get("accounts").get("items"), "Application->Accounts shouldn't be expanded"
+
+        //Get the application again twice expanding the accounts attribute
+        2.times {
+            def appWithAccounts = client.getApplications(Applications.where(Applications.name().eqIgnoreCase(app.name)).withAccounts()).first()
+            assertNotNull getValue(AbstractResource, appWithAccounts, "properties").get("accounts").get("items"), "Application->Accounts should be expanded"
+        }
+    }
+
+    /**
      * @since 1.0.RC8
      */
     @Test
-    void testSamlProperties(){
+    void testSamlProperties() {
         def app = createTempApp()
 
         def samlPolicy = app.getSamlPolicy()
@@ -646,10 +697,10 @@ class ApplicationIT extends ClientIT {
         assertEquals callbackUris.iterator().next(), uri
 
         List<String> testUris = new ArrayList<String>()
-            testUris.add("https://myapplication.com/callback1")
-            testUris.add("https://myapplication.com/callback2")
-            testUris.add("https://myapplication.com/callback3")
-            testUris.add("https://myapplication.com/callback4")
+        testUris.add("https://myapplication.com/callback1")
+        testUris.add("https://myapplication.com/callback2")
+        testUris.add("https://myapplication.com/callback3")
+        testUris.add("https://myapplication.com/callback4")
 
         app.setAuthorizedCallbackUris(testUris)
         callbackUris = app.getAuthorizedCallbackUris()
@@ -694,8 +745,10 @@ class ApplicationIT extends ClientIT {
 
         assertNotNull appApiKey
 
-        assertTrue(appApiKey.account.propertyNames.size() > 1) // testing expansion on the object retrieved from the server
-        assertTrue(appApiKey.tenant.propertyNames.size() > 1) // testing expansion on the object retrieved from the server
+        assertTrue(appApiKey.account.propertyNames.size() > 1)
+        // testing expansion on the object retrieved from the server
+        assertTrue(appApiKey.tenant.propertyNames.size() > 1)
+        // testing expansion on the object retrieved from the server
 
         assertNotNull appApiKey2
 
@@ -833,13 +886,13 @@ class ApplicationIT extends ClientIT {
         Account account = client.instantiate(Account)
         account.givenName = 'John'
         account.surname = 'DELETEME'
-        account.email =  email
+        account.email = email
         account.password = 'Changeme1!'
 
         app.createAccount(account)
         deleteOnTeardown(account)
 
-        return  account
+        return account
     }
 
     String decryptSecretFromCacheMap(Map cacheMap) {
@@ -903,7 +956,8 @@ class ApplicationIT extends ClientIT {
     /**
      * @since 1.0.RC
      */
-    @Test(enabled = false) //ignoring because of sporadic Travis failures
+    @Test(enabled = false)
+    //ignoring because of sporadic Travis failures
     void testGetApplicationsWithMapViaTenantActions() {
         def map = new HashMap<String, Object>()
         def appList = client.getApplications(map)
@@ -914,7 +968,8 @@ class ApplicationIT extends ClientIT {
     /**
      * @since 1.0.RC
      */
-    @Test(enabled = false) //ignoring because of sporadic Travis failures
+    @Test(enabled = false)
+    //ignoring because of sporadic Travis failures
     void testGetApplicationsWithAppCriteriaViaTenantActions() {
         def appCriteria = Applications.criteria()
         def appList = client.getApplications(appCriteria)
@@ -945,7 +1000,8 @@ class ApplicationIT extends ClientIT {
     /**
      * @since 1.0.RC3
      */
-    @Test(enabled = false) //ignoring because of sporadic Travis failures
+    @Test(enabled = false)
+    //ignoring because of sporadic Travis failures
     void testAddAccountStore_Dirs() {
         def count = 1
         while (count >= 0) { //re-trying once
@@ -1012,7 +1068,8 @@ class ApplicationIT extends ClientIT {
     /**
      * @since 1.0.RC3
      */
-    @Test(enabled = false) //ignoring because of sporadic Travis failures
+    @Test(enabled = false)
+    //ignoring because of sporadic Travis failures
     void testAddAccountStore_Groups() {
         def count = 1
         while (count >= 0) { //re-trying once
@@ -1081,11 +1138,11 @@ class ApplicationIT extends ClientIT {
         }
     }
 
-
     /**
      * @since 1.0.RC3
      */
-    @Test(enabled = false, expectedExceptions = IllegalArgumentException)  //ignoring because of sporadic Travis failures
+    @Test(enabled = false, expectedExceptions = IllegalArgumentException)
+    //ignoring because of sporadic Travis failures
     void testAddAccountStore_DirAndGroupMatch() {
 
         Directory dir01 = client.instantiate(Directory)
@@ -1136,7 +1193,8 @@ class ApplicationIT extends ClientIT {
     /**
      * @since 1.0.RC3
      */
-    @Test(enabled = false, expectedExceptions = IllegalArgumentException) //ignoring because of sporadic Travis failures
+    @Test(enabled = false, expectedExceptions = IllegalArgumentException)
+    //ignoring because of sporadic Travis failures
     void testAddAccountStore_MultipleGroupCriteria() {
 
         Directory dir01 = client.instantiate(Directory)
@@ -1167,6 +1225,145 @@ class ApplicationIT extends ClientIT {
     }
 
     /**
+     * @since 1.0.RC9
+     */
+    @Test
+    void testAddAccountStoreByName_Null() {
+
+        def app = createTempApp()
+
+        assertNull app.addAccountStore("does not exist")
+    }
+
+    /**
+     * @since 1.0.RC9
+     */
+    @Test
+    void testAddAccountStoreByName_Exception() {
+
+        def name = uniquify("Java SDK: ApplicationIT.testAddAccountStore")
+
+        Directory dir = client.instantiate(Directory)
+        dir.name = name
+        dir.description = dir.name + "-Description"
+        dir = client.currentTenant.createDirectory(dir)
+        deleteOnTeardown(dir)
+
+        Group group = client.instantiate(Group)
+        group.name = name
+        group.description = group.name + "-Description"
+        dir.createGroup(group)
+
+        def app = createTempApp()
+
+        try {
+            app.addAccountStore(name)
+            fail("shouldn't get here")
+        } catch (IllegalArgumentException e) {
+            assertEquals e.getMessage(),
+                    "There are both a Directory and a Group matching the provided name in the current tenant. " +
+                            "Please provide the href of the intended Resource instead of its name in order to univocally identify it."
+        }
+    }
+
+    /**
+     * @since 1.0.RC9
+     */
+    @Test
+    void testAddAccountStoreByName() {
+
+        def dirName = uniquify("Java SDK: ApplicationIT.testAddAccountStore_dir")
+        def groupName = uniquify("Java SDK: ApplicationIT.testAddAccountStore_group")
+
+        Directory dir = client.instantiate(Directory)
+        dir.name = dirName
+        dir.description = dir.name + "-Description"
+        dir = client.currentTenant.createDirectory(dir)
+        deleteOnTeardown(dir)
+
+        Group group = client.instantiate(Group)
+        group.name = groupName
+        group.description = group.name + "-Description"
+        dir.createGroup(group)
+
+        def app = createTempApp()
+        def accountStoreMappting = app.addAccountStore(dirName)
+
+        assertEquals accountStoreMappting.accountStore.href, dir.href
+
+        app = createTempApp()
+        accountStoreMappting = app.addAccountStore(groupName)
+
+        assertEquals accountStoreMappting.accountStore.href, group.href
+    }
+
+    /**
+     * @since 1.0.RC9
+     */
+    @Test
+    void testAddAccountStoreByDirectoryCriteria() {
+
+        def dirName = uniquify("Java SDK: ApplicationIT.testAddAccountStore_dir")
+
+        Directory dir = client.instantiate(Directory)
+        dir.name = dirName
+        dir.description = dir.name + "-Description"
+        dir = client.currentTenant.createDirectory(dir)
+        deleteOnTeardown(dir)
+
+        def app = createTempApp()
+        def accountStoreMapping = app.addAccountStore(Directories.where(Directories.name().eqIgnoreCase(dirName)))
+
+        assertEquals accountStoreMapping.accountStore.href, dir.href
+    }
+
+    /**
+     * @since 1.0.RC9
+     */
+    @Test
+    void testAddAccountStoreByOrganizationCriteria() {
+
+        def orgName = uniquify("Java SDK: ApplicationIT.testAddAccountStore_org")
+
+        Organization org = client.instantiate(Organization)
+        org.nameKey = uniquify("my-org")
+        org.name = orgName
+        org.description = org.name + "-Description"
+        org = client.currentTenant.createOrganization(org)
+        deleteOnTeardown(org)
+
+        def app = createTempApp()
+        def accountStoreMapping = app.addAccountStore(Organizations.where(Organizations.name().eqIgnoreCase(orgName)))
+
+        assertEquals accountStoreMapping.accountStore.href, org.href
+    }
+
+    /**
+     * @since 1.0.RC9
+     */
+    @Test
+    void testAddAccountStoreByGroupCriteria() {
+
+        def groupName = uniquify("Java SDK: ApplicationIT.testAddAccountStore_group")
+
+        Directory dir = client.instantiate(Directory)
+        dir.name = uniquify("Java SDK: ApplicationIT.testAddAccountStore_dir")
+        dir.description = dir.name + "-Description"
+        dir = client.currentTenant.createDirectory(dir)
+        deleteOnTeardown(dir)
+
+        Group group = client.instantiate(Group)
+        group.name = groupName
+        group.description = group.name + "-Description"
+        dir.createGroup(group)
+
+        def app = createTempApp()
+        def accountStoreMapping = app.addAccountStore(Groups.where(Groups.name().eqIgnoreCase(groupName)))
+
+        assertEquals accountStoreMapping.accountStore.href, group.href
+    }
+
+    /**
      * @since 1.0.RC4.4
      */
     @Test
@@ -1182,7 +1379,7 @@ class ApplicationIT extends ClientIT {
         try {
             app.getAccounts().single()
             fail("should have thrown")
-        } catch ( IllegalStateException e) {
+        } catch (IllegalStateException e) {
             assertEquals(e.getMessage(), "Only a single resource was expected, but this list contains more than one item.")
         }
 
@@ -1191,7 +1388,7 @@ class ApplicationIT extends ClientIT {
         try {
             app.getAccounts(Accounts.where(Accounts.email().eqIgnoreCase("thisEmailDoesNotBelong@ToAnAccount.com"))).single()
             fail("should have thrown")
-        } catch ( IllegalStateException e) {
+        } catch (IllegalStateException e) {
             assertEquals(e.getMessage(), "This list is empty while it was expected to contain one (and only one) element.")
         }
     }
@@ -1245,8 +1442,8 @@ class ApplicationIT extends ClientIT {
         acct.surname = 'Smith'
         acct = app.createAccount(Accounts.newCreateRequestFor(acct).setRegistrationWorkflowEnabled(false).build())
 
-        def options = UsernamePasswordRequest.options().withAccount()
-        def request = UsernamePasswordRequest.builder().setUsernameOrEmail(username).setPassword(password).withResponseOptions(options).build()
+        def options = UsernamePasswordRequests.options().withAccount()
+        def request = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password).withResponseOptions(options).build()
 
         def result = app.authenticateAccount(request)
 
@@ -1256,7 +1453,7 @@ class ApplicationIT extends ClientIT {
         assertEquals properties.get("account").get("email"), acct.email
 
         //Let's re-authenticate without expansion
-        request = UsernamePasswordRequest.builder().setUsernameOrEmail(username).setPassword(password).build()
+        request = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password).build()
         result = app.authenticateAccount(request)
 
         //Let's check that there is no expansion
@@ -1264,9 +1461,10 @@ class ApplicationIT extends ClientIT {
         assertTrue properties.get("account").size() == 1
     }
 
-    private static assertAccountStoreMappingListSize(ApplicationAccountStoreMappingList accountStoreMappings, int expectedSize) {
+    private
+    static assertAccountStoreMappingListSize(ApplicationAccountStoreMappingList accountStoreMappings, int expectedSize) {
         int qty = 0;
-        for(ApplicationAccountStoreMapping accountStoreMapping : accountStoreMappings) {
+        for (ApplicationAccountStoreMapping accountStoreMapping : accountStoreMappings) {
             qty++;
         }
         assertEquals(qty, expectedSize)
@@ -1276,7 +1474,7 @@ class ApplicationIT extends ClientIT {
      * @since 1.0.RC4.6
      */
     @Test
-    void testSaveWithResponseOptions(){
+    void testSaveWithResponseOptions() {
 
         def app = createTempApp()
         def href = app.getHref()
@@ -1321,7 +1519,8 @@ class ApplicationIT extends ClientIT {
         acct = app.createAccount(Accounts.newCreateRequestFor(acct).setRegistrationWorkflowEnabled(false).build())
         deleteOnTeardown(acct)
 
-        def account = app.authenticateAccount(new UsernamePasswordRequest(username, password)).getAccount()
+        def request = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password).build()
+        def account = app.authenticateAccount(request).getAccount()
         assertEquals account.getEmail(), email
 
         PasswordResetToken token = app.sendPasswordResetEmail(email)
@@ -1331,14 +1530,16 @@ class ApplicationIT extends ClientIT {
         account = app.resetPassword(token.getValue(), "newPassword123!")
 
         try {
-            account = app.authenticateAccount(new UsernamePasswordRequest(username, password)).getAccount()
+            def upreq = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword(password).build()
+            account = app.authenticateAccount(upreq).getAccount()
             fail("should have thrown due to wrong password")
         } catch (ResourceException e) {
             assertTrue(e.getMessage().contains("Login attempt failed because the specified password is incorrect."))
         }
 
         //login with the new password
-        account = app.authenticateAccount(new UsernamePasswordRequest(username, "newPassword123!")).getAccount()
+        def upreq = UsernamePasswordRequests.builder().setUsernameOrEmail(username).setPassword("newPassword123!").build()
+        account = app.authenticateAccount(upreq).getAccount()
 
         assertEquals account.getEmail(), email
     }
@@ -1361,10 +1562,10 @@ class ApplicationIT extends ClientIT {
         def app = createTempApp()
 
         Account account = client.instantiate(Account)
-            .setGivenName('John')
-            .setSurname('DeleteMe')
-            .setEmail("deletejohn@test.com")
-            .setPassword('$2y$12$QjSH496pcT5CEbzjD/vtVeH03tfHKFy36d4J0Ltp3lRtee9HDxY3K')
+                .setGivenName('John')
+                .setSurname('DeleteMe')
+                .setEmail("deletejohn@test.com")
+                .setPassword('$2y$12$QjSH496pcT5CEbzjD/vtVeH03tfHKFy36d4J0Ltp3lRtee9HDxY3K')
 
         def created = app.createAccount(Accounts.newCreateRequestFor(account)
                 .setRegistrationWorkflowEnabled(false)
@@ -1376,7 +1577,8 @@ class ApplicationIT extends ClientIT {
         def found = app.getAccounts(Accounts.where(Accounts.email().eqIgnoreCase("deletejohn@test.com"))).single()
         assertEquals(created.href, found.href)
 
-        found = app.authenticateAccount(new UsernamePasswordRequest("deletejohn@test.com", "rasmuslerdorf")).getAccount()
+        def upreq = UsernamePasswordRequests.builder().setUsernameOrEmail("deletejohn@test.com").setPassword("rasmuslerdorf").build()
+        found = app.authenticateAccount(upreq).getAccount()
         assertEquals(created.href, found.href)
     }
 
@@ -1391,19 +1593,20 @@ class ApplicationIT extends ClientIT {
         Account account = client.instantiate(Account)
         account.givenName = 'John'
         account.surname = 'DeleteMe'
-        account.email =  "deletejohn@test.com"
+        account.email = "deletejohn@test.com"
         account.password = '$INVALID$04$RZPSLGUz3dRdm7aRfxOeYuKeueSPW2YaTpRkszAA31wcPpyg6zkGy'
 
         try {
             app.createAccount(Accounts.newCreateRequestFor(account).setPasswordFormat(PasswordFormat.MCF).build())
             fail("Should have thrown")
-        } catch (ResourceException e){
+        } catch (ResourceException e) {
             assertEquals e.getCode(), 2006
             assertTrue e.getDeveloperMessage().contains("is in an invalid format")
         }
     }
 
     /* @since 1.0.RC7 */
+
     @Test
     void testCreateAndRefreshTokenForAppAccount() {
 
@@ -1414,28 +1617,28 @@ class ApplicationIT extends ClientIT {
         Account account = client.instantiate(Account)
         account.givenName = 'John'
         account.surname = 'DELETEME'
-        account.email =  email
+        account.email = email
         account.password = 'Change&45+me1!'
 
         def created = app.createAccount(account)
         assertNotNull created.href
         deleteOnTeardown(created)
 
-        PasswordGrantRequest createRequest = Oauth2Requests.PASSWORD_GRANT_REQUEST.builder().setLogin(email).setPassword("Change&45+me1!").build();
-        def result = Authenticators.PASSWORD_GRANT_AUTHENTICATOR.forApplication(app).authenticate(createRequest)
+        OAuthPasswordGrantRequestAuthentication createRequest = OAuthRequests.OAUTH_PASSWORD_GRANT_REQUEST.builder().setLogin(email).setPassword("Change&45+me1!").build();
+        def result = Authenticators.OAUTH_PASSWORD_GRANT_REQUEST_AUTHENTICATOR.forApplication(app).authenticate(createRequest)
 
         assertNotNull result
         assertNotNull result.accessTokenString
         assertNotNull result.accessTokenHref
         assertEquals result.getAccessToken().getAccount().getEmail(), email
         assertEquals result.getAccessToken().getApplication().getHref(), app.href
-        assertEquals(((Map)result.getAccessToken().getExpandedJwt().get("claims")).get("iss"), app.getHref())
-        assertNotNull(((Map)result.getAccessToken().getExpandedJwt().get("claims")).get("rti"))
-        assertEquals(((Map)result.getAccessToken().getExpandedJwt().get("header")).get("alg"), SignatureAlgorithm.HS256.toString())
+        assertEquals(((Map) result.getAccessToken().getExpandedJwt().get("claims")).get("iss"), app.getHref())
+        assertNotNull(((Map) result.getAccessToken().getExpandedJwt().get("claims")).get("rti"))
+        assertEquals(((Map) result.getAccessToken().getExpandedJwt().get("header")).get("alg"), SignatureAlgorithm.HS256.toString())
         assertNotNull(result.getAccessToken().getExpandedJwt().get("signature"))
 
-        RefreshGrantRequest request = Oauth2Requests.REFRESH_GRANT_REQUEST.builder().setRefreshToken(result.getRefreshTokenString()).build();
-        result = Authenticators.REFRESH_GRANT_AUTHENTICATOR.forApplication(app).authenticate(request)
+        OAuthRefreshTokenRequestAuthentication request = OAuthRequests.OAUTH_REFRESH_TOKEN_REQUEST.builder().setRefreshToken(result.getRefreshTokenString()).build();
+        result = Authenticators.OAUTH_REFRESH_TOKEN_REQUEST_AUTHENTICATOR.forApplication(app).authenticate(request)
 
         assertNotNull result
         assertTrue result.accessTokenString.size() > 1
@@ -1445,18 +1648,19 @@ class ApplicationIT extends ClientIT {
         assertTrue(result.getRefreshToken().getHref().contains("/refreshTokens/"))
         assertEquals result.getRefreshToken().getAccount().getEmail(), email
         assertEquals result.getRefreshToken().getApplication().getHref(), app.href
-        assertEquals(((Map)result.getRefreshToken().getExpandedJwt().get("claims")).get("sub"), account.getHref())
-        assertNull(((Map)result.getRefreshToken().getExpandedJwt().get("claims")).get("rti"))
-        assertEquals(((Map)result.getRefreshToken().getExpandedJwt().get("header")).get("alg"), SignatureAlgorithm.HS256.toString())
+        assertEquals(((Map) result.getRefreshToken().getExpandedJwt().get("claims")).get("sub"), account.getHref())
+        assertNull(((Map) result.getRefreshToken().getExpandedJwt().get("claims")).get("rti"))
+        assertEquals(((Map) result.getRefreshToken().getExpandedJwt().get("header")).get("alg"), SignatureAlgorithm.HS256.toString())
         assertNotNull(result.getRefreshToken().getExpandedJwt().get("signature"))
     }
 
     /* @since 1.0.RC7 */
+
     @Test
-    void testRetrieveAndUpdateOauthPolicy(){
+    void testRetrieveAndUpdateOAuthPolicy() {
         def app = createTempApp()
 
-        OauthPolicy oauthPolicy = app.getOauthPolicy()
+        OAuthPolicy oauthPolicy = app.getOAuthPolicy()
         assertNotNull oauthPolicy
         assertEquals oauthPolicy.getApplication().getHref(), app.href
         assertNotNull oauthPolicy.getTokenEndpoint()
@@ -1465,31 +1669,32 @@ class ApplicationIT extends ClientIT {
         oauthPolicy.setRefreshTokenTtl("P2D")
         oauthPolicy.save()
 
-        oauthPolicy = app.getOauthPolicy()
+        oauthPolicy = app.getOAuthPolicy()
         assertEquals oauthPolicy.getAccessTokenTtl(), "P8D"
         assertEquals oauthPolicy.getRefreshTokenTtl(), "P2D"
         assertEquals oauthPolicy.getApplication().getHref(), app.href
     }
 
     /* @since 1.0.RC7 */
+
     @Test
     void testAuthenticateAndDeleteTokenForAppAccount() {
 
         def app = createTempApp()
         def account = createTestAccount(app)
 
-        PasswordGrantRequest grantRequest = Oauth2Requests.PASSWORD_GRANT_REQUEST.builder().setLogin(account.email).setPassword("Changeme1!").build();
-        def grantResult = Authenticators.PASSWORD_GRANT_AUTHENTICATOR.forApplication(app).authenticate(grantRequest)
+        OAuthPasswordGrantRequestAuthentication grantRequest = OAuthRequests.OAUTH_PASSWORD_GRANT_REQUEST.builder().setLogin(account.email).setPassword("Changeme1!").build();
+        def grantResult = Authenticators.OAUTH_PASSWORD_GRANT_REQUEST_AUTHENTICATOR.forApplication(app).authenticate(grantRequest)
 
         // Authenticate token against Stormpath
-        JwtAuthenticationRequest authRequest = Oauth2Requests.JWT_AUTHENTICATION_REQUEST.builder().setJwt(grantResult.getAccessTokenString()).build()
-        def authResultRemote = Authenticators.JWT_AUTHENTICATOR.forApplication(app).authenticate(authRequest)
+        OAuthBearerRequestAuthentication authRequest = OAuthRequests.OAUTH_BEARER_REQUEST.builder().setJwt(grantResult.getAccessTokenString()).build()
+        def authResultRemote = Authenticators.OAUTH_BEARER_REQUEST_AUTHENTICATOR.forApplication(app).authenticate(authRequest)
 
         assertEquals authResultRemote.getApplication().getHref(), app.href
         assertEquals authResultRemote.getAccount().getHref(), account.href
 
         // Authenticate locally
-        JwtAuthenticationResult authResultLocal = Authenticators.JWT_AUTHENTICATOR.forApplication(app).withLocalValidation().authenticate(authRequest)
+        OAuthBearerRequestAuthenticationResult authResultLocal = Authenticators.OAUTH_BEARER_REQUEST_AUTHENTICATOR.forApplication(app).withLocalValidation().authenticate(authRequest)
 
         assertEquals authResultRemote.getHref(), authResultLocal.getHref()
         assertEquals authResultRemote.getAccount().getHref(), authResultLocal.getAccount().getHref()
@@ -1503,39 +1708,40 @@ class ApplicationIT extends ClientIT {
 
         try {
             //try to authenticate deleted token
-            Authenticators.JWT_AUTHENTICATOR.forApplication(app).authenticate(authRequest)
+            Authenticators.OAUTH_BEARER_REQUEST_AUTHENTICATOR.forApplication(app).authenticate(authRequest)
             fail("Should have thrown due to unexistent token")
-        } catch (Exception e){
+        } catch (Exception e) {
             def message = e.getMessage()
             assertTrue message.contains("Token does not exist. This can occur if the token has been manually deleted, or if the token has expired and removed by Stormpath.")
         }
 
         // Deleted tokens are still valid when local validation is used
-        assertNotNull Authenticators.JWT_AUTHENTICATOR.forApplication(app).withLocalValidation().authenticate(authRequest)
+        assertNotNull Authenticators.OAUTH_BEARER_REQUEST_AUTHENTICATOR.forApplication(app).withLocalValidation().authenticate(authRequest)
     }
 
     /* @since 1.0.RC8.3 */
+
     @Test
     void testAttemptAuthenticationWithRefreshToken() {
         def app = createTempApp()
         def account = createTestAccount(app)
 
-        PasswordGrantRequest grantRequest = Oauth2Requests.PASSWORD_GRANT_REQUEST.builder()
-            .setLogin(account.email)
-            .setPassword("Changeme1!")
-            .build()
+        OAuthPasswordGrantRequestAuthentication grantRequest = OAuthRequests.OAUTH_PASSWORD_GRANT_REQUEST.builder()
+                .setLogin(account.email)
+                .setPassword("Changeme1!")
+                .build()
 
-        def grantResult = Authenticators.PASSWORD_GRANT_AUTHENTICATOR
-            .forApplication(app)
-            .authenticate(grantRequest)
+        def grantResult = Authenticators.OAUTH_PASSWORD_GRANT_REQUEST_AUTHENTICATOR
+                .forApplication(app)
+                .authenticate(grantRequest)
 
         // Authenticate token against Stormpath using refresh token <--- INVALID
-        JwtAuthenticationRequest authRequest = Oauth2Requests.JWT_AUTHENTICATION_REQUEST.builder()
-            .setJwt(grantResult.getRefreshTokenString())
-            .build()
+        OAuthBearerRequestAuthentication authRequest = OAuthRequests.OAUTH_BEARER_REQUEST.builder()
+                .setJwt(grantResult.getRefreshTokenString())
+                .build()
 
         try {
-            Authenticators.JWT_AUTHENTICATOR.forApplication(app).authenticate(authRequest)
+            Authenticators.OAUTH_BEARER_REQUEST_AUTHENTICATOR.forApplication(app).authenticate(authRequest)
             fail("Should have thrown")
         } catch (Exception e) {
             def message = e.getMessage()
@@ -1544,27 +1750,28 @@ class ApplicationIT extends ClientIT {
     }
 
     /* @since 1.0.RC8.3 */
+
     @Test
     void testAttemptAuthenticationWithRefreshTokenWithLocalValidation() {
         def app = createTempApp()
         def account = createTestAccount(app)
 
-        PasswordGrantRequest grantRequest = Oauth2Requests.PASSWORD_GRANT_REQUEST.builder()
+        OAuthPasswordGrantRequestAuthentication grantRequest = OAuthRequests.OAUTH_PASSWORD_GRANT_REQUEST.builder()
                 .setLogin(account.email)
                 .setPassword("Changeme1!")
                 .build()
 
-        def grantResult = Authenticators.PASSWORD_GRANT_AUTHENTICATOR
+        def grantResult = Authenticators.OAUTH_PASSWORD_GRANT_REQUEST_AUTHENTICATOR
                 .forApplication(app)
                 .authenticate(grantRequest)
 
         // Authenticate token against Stormpath using refresh token <--- INVALID
-        JwtAuthenticationRequest authRequest = Oauth2Requests.JWT_AUTHENTICATION_REQUEST.builder()
+        OAuthBearerRequestAuthentication authRequest = OAuthRequests.OAUTH_BEARER_REQUEST.builder()
                 .setJwt(grantResult.getRefreshTokenString())
                 .build()
 
         try {
-            Authenticators.JWT_AUTHENTICATOR.forApplication(app).withLocalValidation().authenticate(authRequest)
+            Authenticators.OAUTH_BEARER_REQUEST_AUTHENTICATOR.forApplication(app).withLocalValidation().authenticate(authRequest)
             fail("Should have thrown")
         } catch (Exception e) {
             def message = e.getMessage()
@@ -1572,41 +1779,71 @@ class ApplicationIT extends ClientIT {
         }
     }
 
-
     /* @since 1.0.RC7 */
+
     @Test
     void testInvalidTokenViaLocalValidation() {
 
         def app = createTempApp()
         def account = createTestAccount(app)
 
-        PasswordGrantRequest grantRequest = Oauth2Requests.PASSWORD_GRANT_REQUEST.builder().setLogin(account.email).setPassword("Changeme1!").build();
-        def grantResult = Authenticators.PASSWORD_GRANT_AUTHENTICATOR.forApplication(app).authenticate(grantRequest)
+        OAuthPasswordGrantRequestAuthentication grantRequest = OAuthRequests.OAUTH_PASSWORD_GRANT_REQUEST.builder().setLogin(account.email).setPassword("Changeme1!").build();
+        def grantResult = Authenticators.OAUTH_PASSWORD_GRANT_REQUEST_AUTHENTICATOR.forApplication(app).authenticate(grantRequest)
 
         String jwt = grantResult.getAccessTokenString();
-        def charToChange = jwt.charAt(jwt.indexOf(".") + 5)
-        String tamperedJwt = jwt.replace(charToChange, (Character) charToChange.equals('X') ? 'Z' : 'X')
+        Character charToChange = jwt.charAt(jwt.indexOf(".") + 5)
+        Character replaceWith = charToChange.equals('X') ? 'Z' : 'X'
+        String tamperedJwt = jwt.replace(charToChange, replaceWith)
 
-        JwtAuthenticationRequest authRequest = Oauth2Requests.JWT_AUTHENTICATION_REQUEST.builder().setJwt(tamperedJwt).build()
+        OAuthBearerRequestAuthentication authRequest = OAuthRequests.OAUTH_BEARER_REQUEST.builder().setJwt(tamperedJwt).build()
 
         try {
             //try to authenticate a tampered token
-            Authenticators.JWT_AUTHENTICATOR.forApplication(app).withLocalValidation().authenticate(authRequest)
+            Authenticators.OAUTH_BEARER_REQUEST_AUTHENTICATOR.forApplication(app).withLocalValidation().authenticate(authRequest)
             fail("Should have thrown")
-        } catch (Exception e){
+        } catch (Exception e) {
             def message = e.getMessage()
             assertTrue message.equals("JWT failed validation; it cannot be trusted.")
         }
 
         def app2 = createTempApp()
-        authRequest = Oauth2Requests.JWT_AUTHENTICATION_REQUEST.builder().setJwt(jwt).build()
+        authRequest = OAuthRequests.OAUTH_BEARER_REQUEST.builder().setJwt(jwt).build()
         try {
             //try to use a valid token with another application
-            Authenticators.JWT_AUTHENTICATOR.forApplication(app2).withLocalValidation().authenticate(authRequest)
+            Authenticators.OAUTH_BEARER_REQUEST_AUTHENTICATOR.forApplication(app2).withLocalValidation().authenticate(authRequest)
             fail("Should have thrown")
-        } catch (Exception e){
+        } catch (Exception e) {
             def message = e.getMessage()
             assertTrue message.equals("JWT failed validation; it cannot be trusted.")
+        }
+    }
+
+    /** @since 1.0.0 */
+    @Test
+    void testCreateTokenWithWrongAccountStore() {
+
+        def app = createTempApp()
+
+        def email = uniquify('testCreateToken+') + '@nowhere.com'
+
+        Account account = client.instantiate(Account)
+        account.givenName = 'John'
+        account.surname = 'DELETEME'
+        account.email = email
+        account.password = 'Change&45+me1!'
+
+        Directory dir = client.instantiate(Directory)
+        dir.name = uniquify("Java SDK: ApplicationIT.testCreateTokenWithWrongAccountStore")
+        dir = client.currentTenant.createDirectory(dir);
+        app.addAccountStore(dir)
+        deleteOnTeardown(dir)
+
+        try {
+            OAuthPasswordGrantRequestAuthentication createRequest = OAuthRequests.OAUTH_PASSWORD_GRANT_REQUEST.builder().setAccountStore(dir).setLogin(email).setPassword("Change&45+me1!").build()
+            Authenticators.OAUTH_PASSWORD_GRANT_REQUEST_AUTHENTICATOR.forApplication(app).authenticate(createRequest)
+            throw new Exception("Should have thrown. Expected Error code: 7104.");
+        } catch (ResourceException e) {
+            assertEquals(e.getCode(), 7104)
         }
     }
 
@@ -1629,4 +1866,53 @@ class ApplicationIT extends ClientIT {
         assertTrue samlServiceProvider.getModifiedAt().after(testStart)
     }
 
+    /** since 1.0.RC9 */
+    @Test
+    void testNewSamlIdpUrlBuilder() {
+
+        def app = createTempApp()
+        def samlIdpUrlBuilder = app.newSamlIdpUrlBuilder()
+        def callbackUri = "https://my.awesome.app/saml_callback"
+
+        def urlString = samlIdpUrlBuilder.setCallbackUri(callbackUri).build()
+        def jwtBeg = urlString.indexOf("accessToken=") + "accessToken=".length()
+        def jwt = urlString.substring(jwtBeg)
+
+        Jws<Claims> claims = Jwts.parser().setSigningKey(client.apiKey.secret.bytes).parseClaimsJws(jwt)
+        String jwtCallbackUri = claims.getBody().get("cb_uri")
+
+        assertEquals jwtCallbackUri, callbackUri
+    }
+
+    /** since 1.0.RC9 */
+    // This just tests that the application can create a SamlCallbackHandler
+    // DefaultSamlCallbackHandler should have its own tests
+    @Test
+    void testNewSamlCallbackHandler() {
+
+        // setup result jwt
+        def jwt = Jwts.builder()
+            .setHeaderParam(JwsHeader.KEY_ID, client.apiKey.id)
+            .setAudience(client.apiKey.id)
+            .setExpiration(new Date(new Date().getTime() + (1000 * 60 * 60 * 24)))
+            .setIssuer("my issuer")
+            .claim(IdSiteClaims.RESPONSE_ID, "my response id")
+            .claim(IdSiteClaims.STATUS, SamlResultStatus.LOGOUT)
+            .claim(IdSiteClaims.IS_NEW_SUBJECT, false)
+            .signWith(SignatureAlgorithm.HS256, client.apiKey.secret.getBytes("UTF-8"))
+        .compact()
+
+        def req = createMock(HttpServletRequest)
+        expect(req.getMethod()).andReturn(HttpMethod.GET.name()).times(2)
+        expect(req.getParameter(IdSiteClaims.JWT_RESPONSE)).andReturn(jwt)
+
+        replay req
+
+        def app = createTempApp()
+        def samlCallbackHandler = app.newSamlCallbackHandler(req)
+
+        def result = samlCallbackHandler.accountResult
+
+        assertFalse result.newAccount
+    }
 }

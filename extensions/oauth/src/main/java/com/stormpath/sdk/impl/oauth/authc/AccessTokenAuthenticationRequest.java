@@ -22,7 +22,7 @@ import com.stormpath.sdk.error.authc.MissingApiKeyException;
 import com.stormpath.sdk.http.HttpRequest;
 import com.stormpath.sdk.impl.error.ApiAuthenticationExceptionFactory;
 import com.stormpath.sdk.impl.http.ServletHttpRequest;
-import com.stormpath.sdk.impl.oauth.http.OauthHttpServletRequest;
+import com.stormpath.sdk.impl.oauth.http.OAuthHttpServletRequest;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.oauth.ScopeFactory;
 import org.apache.oltu.oauth2.as.request.OAuthTokenRequest;
@@ -70,7 +70,7 @@ public class AccessTokenAuthenticationRequest extends OAuthTokenRequest implemen
         if (httpRequest instanceof ServletHttpRequest) {
             return ((ServletHttpRequest)httpRequest).getHttpServletRequest();
         } else {
-            return new OauthHttpServletRequest(httpRequest);
+            return new OAuthHttpServletRequest(httpRequest);
         }
     }
 
@@ -122,6 +122,6 @@ public class AccessTokenAuthenticationRequest extends OAuthTokenRequest implemen
     /* @since 1.0.RC5 */
     @Override
     public AuthenticationOptions getResponseOptions() {
-        throw new UnsupportedOperationException(getClass().getName() + " .getResponseOptions() is not supported.");
+        throw new UnsupportedOperationException(getClass().getName() + ".getResponseOptions() is not supported.");
     }
 }

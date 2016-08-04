@@ -15,88 +15,172 @@
  */
 package com.stormpath.sdk.servlet.filter.account;
 
+import com.stormpath.sdk.account.Account;
+import com.stormpath.sdk.application.Application;
 import com.stormpath.sdk.authc.AuthenticationResult;
+import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.lang.Strings;
 import com.stormpath.sdk.oauth.AccessTokenResult;
+import com.stormpath.sdk.oauth.Authenticators;
+import com.stormpath.sdk.oauth.OAuthGrantRequestAuthenticationResult;
+import com.stormpath.sdk.oauth.OAuthRequestAuthentication;
+import com.stormpath.sdk.oauth.OAuthRequests;
+import com.stormpath.sdk.servlet.application.ApplicationResolver;
+import com.stormpath.sdk.servlet.authc.impl.TransientAuthenticationResult;
+import com.stormpath.sdk.servlet.client.ClientResolver;
 import com.stormpath.sdk.servlet.config.CookieConfig;
 import com.stormpath.sdk.servlet.http.CookieSaver;
 import com.stormpath.sdk.servlet.http.Resolver;
 import com.stormpath.sdk.servlet.http.Saver;
+import com.stormpath.sdk.servlet.util.SecureRequiredExceptForLocalhostResolver;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.JwsHeader;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import org.joda.time.DateTime;
+import org.joda.time.Seconds;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.UnsupportedEncodingException;
+import java.util.Date;
 
 /**
  * @since 1.0.RC3
  */
-public class CookieAuthenticationResultSaver extends AccountCookieHandler implements Saver<AuthenticationResult> {
+public class CookieAuthenticationResultSaver implements Saver<AuthenticationResult> {
 
-    private AuthenticationJwtFactory authenticationJwtFactory;
+    private static final Logger log = LoggerFactory.getLogger(CookieAuthenticationResultSaver.class);
+
+    private static final int DEFAULT_COOKIE_MAX_AGE = 259200;
+
     private Resolver<Boolean> secureCookieRequired;
 
-    public CookieAuthenticationResultSaver(CookieConfig accountCookieConfig,
-                                           Resolver<Boolean> secureCookieRequired,
-                                           AuthenticationJwtFactory authenticationJwtFactory) {
-        super(accountCookieConfig);
-        Assert.notNull(secureCookieRequired, "secureCookieRequired RequestRCondition cannot be null.");
-        Assert.notNull(authenticationJwtFactory, "AuthenticationJwtFactory cannot be null.");
+    private boolean secureWarned = false;
+
+    private final CookieConfig accessTokenCookieConfig;
+    private final CookieConfig refreshTokenCookieConfig;
+
+    public CookieAuthenticationResultSaver(CookieConfig accessTokenCookieConfig,
+                                           CookieConfig refreshTokenCookieConfig,
+                                           Resolver<Boolean> secureCookieRequired) {
+        Assert.notNull(accessTokenCookieConfig, "accessTokenCookieConfig cannot be null.");
+        Assert.notNull(refreshTokenCookieConfig, "refreshTokenCookieConfig cannot be null.");
+        Assert.notNull(secureCookieRequired, "secureCookieRequired cannot be null.");
+        this.accessTokenCookieConfig = accessTokenCookieConfig;
+        this.refreshTokenCookieConfig = refreshTokenCookieConfig;
         this.secureCookieRequired = secureCookieRequired;
-        this.authenticationJwtFactory = authenticationJwtFactory;
-    }
-
-    public Resolver<Boolean> getSecureCookieRequired() {
-        return secureCookieRequired;
-    }
-
-    public AuthenticationJwtFactory getAuthenticationJwtFactory() {
-        return authenticationJwtFactory;
     }
 
     @Override
     public void set(HttpServletRequest request, HttpServletResponse response, AuthenticationResult value) {
+
+        Client client = ClientResolver.INSTANCE.getClient(request);
+        byte[] clientSecret = client.getApiKey().getSecret().getBytes();
 
         if (value == null) {
             remove(request, response);
             return;
         }
 
-        String jwt;
-
         if (value instanceof AccessTokenResult) {
-            jwt = ((AccessTokenResult) value).getTokenResponse().getAccessToken();
-        } else {
-            jwt = getAuthenticationJwtFactory().createAccountJwt(request, response, value);
+            AccessTokenResult accessTokenResult = (AccessTokenResult) value;
+
+            String accessToken = accessTokenResult.getTokenResponse().getAccessToken();
+            String refreshToken = accessTokenResult.getTokenResponse().getRefreshToken();
+
+            getAccessTokenCookieSaver(request, getMaxAge(accessToken, clientSecret)).set(request, response, accessToken);
+            //Client Credentials auth workflow doesn't contains a refresh token
+            if (Strings.hasText(refreshToken)) {
+                getRefreshTokenCookieSaver(request, getMaxAge(refreshToken, clientSecret)).set(request, response, refreshToken);
+            }
         }
+        if (value instanceof TransientAuthenticationResult) {
+            Account account = value.getAccount();
+            Application application = ApplicationResolver.INSTANCE.getApplication(request);
 
-        Saver<String> saver = getCookieSaver(request);
+            //Since we only have the account we need to exchange it for an OAuth2 token
+            try {
+                //code copied from AccessTokenController#clientCredentialsAuthenticationRequest
+                String jwt = Jwts.builder()
+                        .setHeaderParam(JwsHeader.KEY_ID, client.getApiKey().getId())
+                        .setSubject(account.getHref())
+                        .setIssuedAt(new Date())
+                        .setIssuer(application.getHref())
+                        .setAudience(client.getApiKey().getId())
+                        .setExpiration(DateTime.now().plusMinutes(1).toDate())
+                        .claim("status", "AUTHENTICATED").signWith(SignatureAlgorithm.HS256, client.getApiKey().getSecret().getBytes("UTF-8")).compact();
 
-        saver.set(request, response, jwt);
+                OAuthRequestAuthentication authenticationRequest = OAuthRequests.IDSITE_AUTHENTICATION_REQUEST.builder().setToken(jwt).build();
+                OAuthGrantRequestAuthenticationResult authenticationResult = Authenticators.ID_SITE_AUTHENTICATOR.forApplication(application).authenticate(authenticationRequest);
+
+                String accessToken = authenticationResult.getAccessTokenString();
+                String refreshToken = authenticationResult.getRefreshTokenString();
+
+                getAccessTokenCookieSaver(request, getMaxAge(accessToken, clientSecret)).set(request, response, accessToken);
+                getRefreshTokenCookieSaver(request, getMaxAge(refreshToken, clientSecret)).set(request, response, refreshToken);
+            } catch (UnsupportedEncodingException e) {
+                //Should not happen since UTF-8 should always be a supported encoding, but we logged just in case
+                log.error("Error get the client API Secret", e);
+            }
+        }
     }
 
     protected void remove(HttpServletRequest request, HttpServletResponse response) {
-        Saver<String> saver = getCookieSaver(request);
-        saver.set(request, response, null);
+        getAccessTokenCookieSaver(request, -1).set(request, response, null);
+        getRefreshTokenCookieSaver(request, -1).set(request, response, null);
     }
 
-    protected Saver<String> getCookieSaver(HttpServletRequest request) {
-        CookieConfig cfg = getAccountCookieConfig(request);
-        return new CookieSaver(cfg);
+    protected boolean isCookieSecure(final HttpServletRequest request, CookieConfig config) {
+
+        boolean configSecure = config.isSecure();
+
+        Resolver<Boolean> resolver = secureCookieRequired;
+
+        boolean resolverSecure = resolver.get(request, null);
+
+        boolean likelyLocalhost = resolver instanceof SecureRequiredExceptForLocalhostResolver;
+
+        boolean warnable = !configSecure || (!resolverSecure && !likelyLocalhost);
+
+        if (!secureWarned && warnable) {
+            secureWarned = true;
+            String msg = "INSECURE IDENTITY COOKIE CONFIGURATION: Your current Stormpath SDK account cookie " +
+                    "configuration allows insecure identity cookies (transmission over non-HTTPS connections)!  " +
+                    "This should typically never occur otherwise your users will be " +
+                    "susceptible to man-in-the-middle attacks.  For more information in Servlet-only " +
+                    "environments, please see the Security Notice here: " +
+                    "https://docs.stormpath.com/java/servlet-plugin/login.html#https-required and the " +
+                    "documentation on authentication state here: " +
+                    "https://docs.stormpath.com/java/servlet-plugin/login.html#authentication-state and here: " +
+                    "https://docs.stormpath.com/java/servlet-plugin/login.html#cookie-config (the " +
+                    "callout entitled 'Secure Cookies').  If you are using Spring Boot, Spring Boot-specific " +
+                    "documentation for these concepts are here: " +
+                    "https://docs.stormpath.com/java/spring-boot-web/login.html#security-notice " +
+                    "https://docs.stormpath.com/java/spring-boot-web/login.html#authentication-state and " +
+                    "https://docs.stormpath.com/java/spring-boot-web/login.html#cookie-storage";
+            log.warn(msg);
+        }
+
+        return configSecure && resolverSecure;
     }
 
-    protected boolean isSecureCookieRequired(HttpServletRequest request) {
-        return getSecureCookieRequired().get(request, null);
+    private CookieSaver getRefreshTokenCookieSaver(final HttpServletRequest request, final int maxAge) {
+        return getCookieSaver(refreshTokenCookieConfig, request, maxAge);
     }
 
-    @Override
-    protected CookieConfig getAccountCookieConfig(final HttpServletRequest request) {
+    private CookieSaver getAccessTokenCookieSaver(final HttpServletRequest request, final int maxAge) {
+        return getCookieSaver(accessTokenCookieConfig, request, maxAge);
+    }
 
-        final CookieConfig config = super.getAccountCookieConfig(request);
+    private CookieSaver getCookieSaver(final CookieConfig cookieConfig, final HttpServletRequest request, final int maxAge) {
+        final boolean secure = isCookieSecure(request, cookieConfig);
 
-        //should always be true in prod, but allow for localhost development testing:
-        final boolean secure = config.isSecure() && isSecureCookieRequired(request);
-
-        String path = Strings.clean(config.getPath());
+        String path = Strings.clean(cookieConfig.getPath());
         if (!Strings.hasText(path)) {
             path = Strings.clean(request.getContextPath());
         }
@@ -107,25 +191,25 @@ public class CookieAuthenticationResultSaver extends AccountCookieHandler implem
         final String PATH = path;
 
         //wrap it to allow for access during development:
-        return new CookieConfig() {
+        return new CookieSaver(new CookieConfig() {
             @Override
             public String getName() {
-                return config.getName();
+                return cookieConfig.getName();
             }
 
             @Override
             public String getComment() {
-                return config.getComment();
+                return cookieConfig.getComment();
             }
 
             @Override
             public String getDomain() {
-                return config.getDomain();
+                return cookieConfig.getDomain();
             }
 
             @Override
             public int getMaxAge() {
-                return config.getMaxAge();
+                return maxAge;
             }
 
             @Override
@@ -140,8 +224,18 @@ public class CookieAuthenticationResultSaver extends AccountCookieHandler implem
 
             @Override
             public boolean isHttpOnly() {
-                return config.isHttpOnly();
+                return cookieConfig.isHttpOnly();
             }
-        };
+        });
+    }
+
+    private int getMaxAge(String token, byte[] clientSecret) {
+        Jws<Claims> claimsJws = Jwts.parser().setSigningKey(clientSecret).parseClaimsJws(token);
+        DateTime issueAt = new DateTime(claimsJws.getBody().getIssuedAt());
+        DateTime expiration = new DateTime(claimsJws.getBody().getExpiration());
+
+
+
+        return Seconds.secondsBetween(issueAt, expiration).getSeconds() - Seconds.secondsBetween(issueAt, DateTime.now()).getSeconds();
     }
 }

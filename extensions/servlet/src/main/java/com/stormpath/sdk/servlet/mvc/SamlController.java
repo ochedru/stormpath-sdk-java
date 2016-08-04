@@ -70,6 +70,11 @@ public class SamlController extends AbstractController {
         Assert.notNull(samlOrganizationResolver, "idSiteOrganizationResolver must be configured.");
     }
 
+    @Override
+    public boolean isNotAllowedIfAuthenticated() {
+        return true;
+    }
+
     protected Application getApplication(HttpServletRequest request) {
         return ApplicationResolver.INSTANCE.getApplication(request);
     }
@@ -120,6 +125,12 @@ public class SamlController extends AbstractController {
         String callbackUri = buildCallbackUri(request);
 
         SamlIdpUrlBuilder builder = application.newSamlIdpUrlBuilder().setCallbackUri(callbackUri);
+
+        String ash = request.getParameter("href");
+        // if href is passed in as a parameter, set it as a claim in the JWT
+        if (ash != null) {
+            builder.setAccountStoreHref(ash);
+        }
 
         SamlOrganizationContext orgCtx = samlOrganizationResolver.get(request, null);
 

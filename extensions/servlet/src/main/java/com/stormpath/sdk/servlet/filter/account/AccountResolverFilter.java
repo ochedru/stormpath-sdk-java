@@ -16,22 +16,16 @@
 package com.stormpath.sdk.servlet.filter.account;
 
 import com.stormpath.sdk.account.Account;
+import com.stormpath.sdk.account.AccountStatus;
 import com.stormpath.sdk.lang.Assert;
-import com.stormpath.sdk.lang.Collections;
-import com.stormpath.sdk.lang.Strings;
 import com.stormpath.sdk.servlet.account.DefaultAccountResolver;
-import com.stormpath.sdk.servlet.config.Config;
 import com.stormpath.sdk.servlet.filter.HttpFilter;
 import com.stormpath.sdk.servlet.http.Resolver;
 
 import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @since 1.0.RC3
@@ -39,10 +33,8 @@ import java.util.Map;
 //not an orderable filter - always executes immediately after the StormpathFilter but before other user-configured filters.
 public class AccountResolverFilter extends HttpFilter {
 
-    public static final String ACCOUNT_RESOLVER_LOCATIONS = "stormpath.web.account.resolvers";
-    public static final String ACCOUNT_RESOLVER_PROPERTY_PREFIX = ACCOUNT_RESOLVER_LOCATIONS + ".";
-
     private List<Resolver<Account>> resolvers;
+    private String oauthEndpointUri;
 
     public List<Resolver<Account>> getResolvers() {
         return resolvers;
@@ -52,51 +44,37 @@ public class AccountResolverFilter extends HttpFilter {
         this.resolvers = resolvers;
     }
 
+    public void setOauthEndpointUri(String oauthEndpointUri) {
+        this.oauthEndpointUri = oauthEndpointUri;
+    }
+
     @SuppressWarnings("unchecked")
     @Override
-    protected void onInit() throws ServletException {
+    protected void onInit() throws Exception {
+        Assert.notEmpty(resolvers, "resolvers cannot be null or empty.");
+        Assert.hasText(oauthEndpointUri, "oauthEndpointUri cannot be null or empty.");
+    }
 
-        if (!Collections.isEmpty(this.resolvers)) {
-            //configured programatically (e.g. w/ Spring), so just return:
-            return;
-        }
-
-        //not configured programatically - fall back to properties - based configuration
-
-        Config config = getConfig();
-
-        List<String> locations = null;
-        String val = config.get(ACCOUNT_RESOLVER_LOCATIONS);
-        if (Strings.hasText(val)) {
-            String[] locs = Strings.split(val);
-            locations = Arrays.asList(locs);
-        }
-
-        Assert.notEmpty(locations, "At least one " + ACCOUNT_RESOLVER_LOCATIONS + " must be specified.");
-        assert locations != null;
-
-        Map<String,Resolver> resolverMap = config.getInstances(ACCOUNT_RESOLVER_PROPERTY_PREFIX, Resolver.class);
-
-        List<Resolver<Account>> resolvers = new ArrayList<Resolver<Account>>(resolverMap.size());
-
-        for(String location : locations) {
-
-            Resolver resolver = resolverMap.get(location);
-            Assert.notNull(resolver, "There is no configured Account Resolver named " + location);
-
-            Resolver<Account> accountResolver = (Resolver<Account>)resolver;
-            resolvers.add(accountResolver);
-        }
-
-        resolvers = java.util.Collections.unmodifiableList(resolvers);
-        setResolvers(resolvers);
+    /**
+     * Returns {@code false} if the current request is the oauth endpoint URI, otherwise {@code true}.  This is to
+     * ensure that the oauth endpoint can properly handle errors in the client_credentials grant type
+     *
+     * @param request  the incoming servlet request
+     * @param response the outbound servlet response
+     * @return {@code false} if the current request is the oauth endpoint URI, otherwise {@code true}.
+     * @see <a href="https://github.com/stormpath/stormpath-sdk-java/issues/685">Issue 685</a>
+     * @since 1.0.0
+     */
+    @Override
+    protected boolean isEnabled(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        return !request.getServletPath().contains(oauthEndpointUri);
     }
 
     @Override
     protected void filter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
         throws Exception {
 
-        for(Resolver<Account> resolver : getResolvers()) {
+        for (Resolver<Account> resolver : getResolvers()) {
 
             Account account = resolver.get(request, response);
 
@@ -105,7 +83,7 @@ public class AccountResolverFilter extends HttpFilter {
                 return;
             }
 
-            if (account != null) {
+            if (account != null && AccountStatus.ENABLED.equals(account.getStatus())) {
 
                 //store under both names - can be convenient depending on how it is accessed:
                 request.setAttribute(DefaultAccountResolver.REQUEST_ATTR_NAME, account);

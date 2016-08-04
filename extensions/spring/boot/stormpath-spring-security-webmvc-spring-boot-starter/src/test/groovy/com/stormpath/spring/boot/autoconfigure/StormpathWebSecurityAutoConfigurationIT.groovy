@@ -15,22 +15,20 @@
  */
 package com.stormpath.spring.boot.autoconfigure
 
-import autoconfigure.StormpathWebSecurityAutoConfigurationApplication
+import autoconfigure.StormpathWebSecurityAutoConfigurationTestApplication
 import com.stormpath.sdk.account.Account
 import com.stormpath.sdk.application.Application
 import com.stormpath.sdk.client.Client
 import com.stormpath.sdk.directory.Directory
-import com.stormpath.sdk.impl.cache.DisabledCacheManager
 import com.stormpath.sdk.lang.Assert
 import com.stormpath.sdk.oauth.Authenticators
-import com.stormpath.sdk.oauth.Oauth2Requests
-import com.stormpath.sdk.oauth.PasswordGrantRequest
+import com.stormpath.sdk.oauth.OAuthPasswordGrantRequestAuthentication
+import com.stormpath.sdk.oauth.OAuthRequests
 import com.stormpath.sdk.resource.Deletable
 import com.stormpath.sdk.servlet.authc.impl.DefaultLogoutRequestEvent
 import com.stormpath.sdk.servlet.client.ClientLoader
 import com.stormpath.sdk.servlet.config.CookieConfig
 import com.stormpath.sdk.servlet.csrf.CsrfTokenManager
-import com.stormpath.sdk.servlet.csrf.DisabledCsrfTokenManager
 import com.stormpath.sdk.servlet.event.RequestEventListener
 import com.stormpath.sdk.servlet.event.TokenRevocationRequestEventListener
 import com.stormpath.sdk.servlet.event.impl.RequestEventPublisher
@@ -39,13 +37,14 @@ import com.stormpath.sdk.servlet.filter.oauth.AccessTokenResultFactory
 import com.stormpath.sdk.servlet.http.Resolver
 import com.stormpath.sdk.servlet.http.authc.AccountStoreResolver
 import com.stormpath.sdk.servlet.mvc.Controller
-import com.stormpath.spring.config.TwoAppTenantStormpathConfiguration
+import com.stormpath.spring.config.TwoAppTenantStormpathTestConfiguration
+import com.stormpath.spring.csrf.SpringSecurityCsrfTokenManager
 import com.stormpath.spring.filter.SpringSecurityResolvedAccountFilter
-import com.stormpath.spring.oauth.Oauth2AuthenticationSpringSecurityProcessingFilter
+import com.stormpath.spring.oauth.OAuthAuthenticationSpringSecurityProcessingFilter
 import com.stormpath.spring.security.authz.CustomDataPermissionsEditor
 import com.stormpath.spring.security.provider.*
-import org.junit.AfterClass
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.test.SpringApplicationConfiguration
 import org.springframework.security.access.PermissionEvaluator
 import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler
@@ -53,6 +52,7 @@ import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.GrantedAuthority
+import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.test.context.testng.AbstractTestNGSpringContextTests
 import org.springframework.test.context.web.WebAppConfiguration
 import org.springframework.web.servlet.HandlerInterceptor
@@ -65,18 +65,13 @@ import javax.servlet.ServletContext
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
-import static org.easymock.EasyMock.createStrictMock
-import static org.easymock.EasyMock.expect
-import static org.easymock.EasyMock.replay
-import static org.easymock.EasyMock.verify
-import static org.testng.Assert.assertEquals
-import static org.testng.Assert.assertNotNull
-import static org.testng.Assert.assertTrue
+import static org.easymock.EasyMock.*
+import static org.testng.Assert.*
 
 /**
  * @since 1.0.RC5
  */
-@SpringApplicationConfiguration(classes = [StormpathWebSecurityAutoConfigurationApplication.class, TwoAppTenantStormpathConfiguration.class])
+@SpringApplicationConfiguration(classes = [StormpathWebSecurityAutoConfigurationTestApplication.class, TwoAppTenantStormpathTestConfiguration.class])
 @WebAppConfiguration
 class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContextTests {
 
@@ -87,7 +82,7 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
     Application application;
 
     @Autowired
-    Oauth2AuthenticationSpringSecurityProcessingFilter oauth2AuthenticationSpringSecurityProcessingFilter;
+    OAuthAuthenticationSpringSecurityProcessingFilter oauth2AuthenticationSpringSecurityProcessingFilter;
 
     @Autowired
     SpringSecurityResolvedAccountFilter springSecurityResolvedAccountFilter;
@@ -116,7 +111,12 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
     UsernamePasswordRequestFactory stormpathUsernamePasswordRequestFactory
 
     @Autowired
-    CookieConfig stormpathAccountCookieConfig
+    @Qualifier("stormpathRefreshTokenCookieConfig")
+    CookieConfig stormpathRefreshTokenCookieConfig
+
+    @Autowired
+    @Qualifier("stormpathAccessTokenCookieConfig")
+    CookieConfig stormpathAccessTokenCookieConfig
 
     @Autowired
     AccessTokenResultFactory stormpathAccessTokenResultFactory
@@ -147,10 +147,8 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
     void test() {
 
         assertNotNull stormpathAuthenticationProvider
-        assertNotNull stormpathAuthenticationProvider.applicationRestUrl
-        assertNotNull stormpathAuthenticationProvider.client
+        assertNotNull stormpathAuthenticationProvider.application
 
-        assertTrue stormpathAuthenticationProvider.client.dataStore.cacheManager instanceof DisabledCacheManager
         assertTrue stormpathAuthenticationProvider.groupGrantedAuthorityResolver instanceof DefaultGroupGrantedAuthorityResolver
         assertTrue stormpathAuthenticationProvider.groupPermissionResolver instanceof GroupCustomDataPermissionResolver
         assertTrue stormpathAuthenticationProvider.accountGrantedAuthorityResolver instanceof EmptyAccountGrantedAuthorityResolver
@@ -171,7 +169,8 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
         assertNotNull stormpathLayoutInterceptor
         assertNotNull stormpathAccountStoreResolver
         assertNotNull stormpathUsernamePasswordRequestFactory
-        assertNotNull stormpathAccountCookieConfig
+        assertNotNull stormpathAccessTokenCookieConfig
+        assertNotNull stormpathRefreshTokenCookieConfig
         assertNotNull stormpathAccessTokenResultFactory
         assertNotNull stormpathCookieAccountResolver
         assertNotNull stormpathLoginController
@@ -180,7 +179,7 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
 
     @Test
     void testCsrfTokenManager() {
-        assertTrue (csrfTokenManager instanceof DisabledCsrfTokenManager)
+        assertTrue (csrfTokenManager instanceof SpringSecurityCsrfTokenManager)
         assertEquals csrfTokenManager.tokenName, '_csrf'
     }
 
@@ -209,7 +208,7 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
 
         Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(account.getEmail(), password))
         assertTrue authentication.authenticated
-        assertTrue (((StormpathUserDetails)authentication.principal).getUsername().equals(account.getUsername()))
+        assertTrue (((UserDetails)authentication.principal).getUsername().equals(account.getHref()))
         assertTrue hasRole(authentication, ["user:edit"] as String[])
     }
 
@@ -222,8 +221,8 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
         def httpServletResponse = createStrictMock(HttpServletResponse.class)
         def servletContext = createStrictMock(ServletContext.class)
 
-        PasswordGrantRequest passwordGrantRequest = Oauth2Requests.PASSWORD_GRANT_REQUEST.builder().setLogin(account.getEmail()).setPassword(password).build();
-        def result = Authenticators.PASSWORD_GRANT_AUTHENTICATOR.forApplication(application).authenticate(passwordGrantRequest)
+        OAuthPasswordGrantRequestAuthentication passwordGrantRequest = OAuthRequests.OAUTH_PASSWORD_GRANT_REQUEST.builder().setLogin(account.getEmail()).setPassword(password).build();
+        def result = Authenticators.OAUTH_PASSWORD_GRANT_REQUEST_AUTHENTICATOR.forApplication(application).authenticate(passwordGrantRequest)
         def accessToken = result.getAccessToken()
 
         expect(httpServletRequest.getHeader("Authorization")).andReturn("Bearer " + accessToken.getJwt())

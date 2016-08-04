@@ -17,8 +17,8 @@ package com.stormpath.sdk.servlet.filter;
 
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.servlet.http.UserAgent;
+import com.stormpath.sdk.servlet.http.UserAgents;
 import com.stormpath.sdk.servlet.http.authc.HeaderAuthenticator;
-import com.stormpath.sdk.servlet.http.impl.DefaultUserAgent;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -38,11 +38,11 @@ public class DefaultUnauthenticatedHandler implements UnauthenticatedHandler {
     @Override
     public boolean onAuthenticationRequired(HttpServletRequest request, HttpServletResponse response) throws Exception {
 
-        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Cache-Control", "no-store, no-cache");
         response.setHeader("Pragma", "no-cache");
 
         if (isHtmlPreferred(request)) {
-            LoginPageRedirector.INSTANCE.redirectToLoginPage(request, response, "authcReqd");
+            LoginPageRedirector.INSTANCE.redirectToLoginPage(request, response);
         } else {
             this.httpAuthenticator.sendChallenge(request, response);
         }
@@ -56,6 +56,6 @@ public class DefaultUnauthenticatedHandler implements UnauthenticatedHandler {
     }
 
     protected UserAgent getUserAgent(HttpServletRequest request) {
-        return new DefaultUserAgent(request);
+        return UserAgents.get(request);
     }
 }

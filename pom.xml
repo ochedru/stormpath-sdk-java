@@ -25,7 +25,7 @@
 
     <groupId>com.stormpath.sdk</groupId>
     <artifactId>stormpath-sdk-root</artifactId>
-    <version>1.0.RC9-dhatim</version>
+    <version>1.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>Stormpath Java SDK</name>
@@ -88,32 +88,33 @@
         <module>extensions</module>
         <module>examples</module>
         <module>tutorials</module>
+        <module>clover</module>
     </modules>
 
     <properties>
 
-        <jdk.version>1.6</jdk.version>
+        <jdk.version>1.7</jdk.version>
 
-        <slf4j.version>1.7.8</slf4j.version>
-        <hazelcast.version>3.2.4</hazelcast.version>
+        <slf4j.version>1.7.21</slf4j.version>
+        <hazelcast.version>3.6.4</hazelcast.version>
         <httpClient.version>4.5.2</httpClient.version>
-        <jackson.version>2.4.4</jackson.version>
-        <jjwt.version>0.5.1</jjwt.version>
-        <oltu.version>1.0.0</oltu.version>
-        <joda-time.version>2.1</joda-time.version>
-
-        <!-- We cannot use servlet-api 3.1 without breaking JDK 6 compatibility because servlet-api 3.1 requires JDK7.
-             See: http://stackoverflow.com/questions/22314453/unsupported-major-minor-version-51-0-error-when-using-1-6-in-pom-and-openjdk6-fo -->
-        <servlet.version>3.0.1</servlet.version>
-        <spring.version>4.2.3.RELEASE</spring.version>
-        <spring.boot.version>1.3.0.RELEASE</spring.boot.version>
-        <spring.security.version>4.0.3.RELEASE</spring.security.version>
+        <jackson.version>2.8.1</jackson.version>
+        <jjwt.version>0.6.0</jjwt.version>
+        <oltu.version>1.0.2</oltu.version>
+        <jsp.version>2.3.1</jsp.version>
+        <joda-time.version>2.9.4</joda-time.version>
+        <snakeyaml.version>1.17</snakeyaml.version>
+        <servlet.version>3.1.0</servlet.version>
+        <spring.version>4.3.2.RELEASE</spring.version>
+        <spring.boot.version>1.4.0.RELEASE</spring.boot.version>
+        <spring.security.version>4.1.1.RELEASE</spring.security.version>
 
         <!-- Test Dependencies: Only required for testing when building the SDK.  Not required by SDK users at runtime: -->
-        <groovy.version>1.8.8</groovy.version>
-        <logback.version>1.1.2</logback.version>
-        <easymock.version>3.1</easymock.version>
-        <testng.version>6.8</testng.version>
+        <groovy.version>2.4.7</groovy.version>
+        <logback.version>1.1.7</logback.version>
+        <powermock.version>1.6.5</powermock.version>
+        <easymock.version>3.4</easymock.version>
+        <testng.version>6.9.10</testng.version>
         <!-- false in JDK 6 profile (i.e. JDK 6 build has ITs turned on): -->
         <skipITs>true</skipITs>
 
@@ -147,7 +148,18 @@
             <version>${easymock.version}</version>
             <scope>test</scope>
         </dependency>
-
+        <dependency>
+            <groupId>org.powermock</groupId>
+            <artifactId>powermock-module-testng</artifactId>
+            <version>${powermock.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.powermock</groupId>
+            <artifactId>powermock-api-easymock</artifactId>
+            <version>${powermock.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <dependencyManagement>
@@ -252,7 +264,6 @@
                 <version>${project.version}</version>
             </dependency>
 
-
             <!-- 3rd party dependencies: -->
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
@@ -281,6 +292,16 @@
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
             <dependency>
@@ -318,7 +339,7 @@
             <dependency>
                 <groupId>javax.servlet.jsp</groupId>
                 <artifactId>javax.servlet.jsp-api</artifactId>
-                <version>2.2.1</version>
+                <version>${jsp.version}</version>
                 <scope>provided</scope>
             </dependency>
             <dependency>
@@ -422,6 +443,18 @@
                 </exclusions>
             </dependency>
             <dependency>
+                <groupId>org.springframework.security</groupId>
+                <artifactId>spring-security-test</artifactId>
+                <version>${spring.security.version}</version>
+                <scope>test</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring.boot.version}</version>
@@ -438,9 +471,12 @@
                 <artifactId>joda-time</artifactId>
                 <version>${joda-time.version}</version>
             </dependency>
-
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>${snakeyaml.version}</version>
+            </dependency>
         </dependencies>
-
     </dependencyManagement>
 
     <build>
@@ -597,6 +633,14 @@
                         </execution>
                     </executions>
                 </plugin>
+                <!-- Speed up dependency report by skipping check to see if resources are in specified repos -->
+                <plugin>
+                    <artifactId>maven-project-info-reports-plugin</artifactId>
+                    <version>2.9</version>
+                    <configuration>
+                        <dependencyLocationsEnabled>false</dependencyLocationsEnabled>
+                    </configuration>
+                </plugin>
             </plugins>
         </pluginManagement>
     </build>
@@ -614,15 +658,113 @@
             </properties>
         </profile>
         <profile>
-            <id>it</id>
-            <activation>
-                <!-- only run the IT tests on one of the JVM builds in Travis CI.  This ensures that we don't hammer
-                the REST api unnecessarily. -->
-                <jdk>1.6</jdk>
-            </activation>
+            <id>clover.all</id>
+            <!-- NOTE: if you want to use this profile and have ITs run, set -DskipITs=false on the command line -->
+            <!--
+                NOTE: This is an older style of config, but currently, clover is unable
+                to work with deeply nested modules.
+            -->
+            <!-- clover - for internal use -->
             <properties>
-                <skipITs>false</skipITs>
+                <clover.coverage.percentage>52%</clover.coverage.percentage>
+                <clover.base.dir>${user.home}/.stormpath/clover</clover.base.dir>
+                <maven.clover.licenseLocation>${clover.base.dir}/clover.license</maven.clover.licenseLocation>
+                <clover.project.dir>${clover.base.dir}/stormpath-sdk-java</clover.project.dir>
+                <clover.history.dir>${clover.project.dir}/history</clover.history.dir>
+                <clover.database.dir>${clover.project.dir}/database</clover.database.dir>
+                <clover.database>${clover.database.dir}/clover.db</clover.database>
+                <clover.version>4.1.1</clover.version>
             </properties>
+
+            <modules>
+                <module>api</module>
+                <module>impl</module>
+                <module>extensions</module>
+                <module>examples</module>
+                <module>tutorials</module>
+                <!-- clover *must* be the last module referenced here in order to properly aggregate test results -->
+                <module>clover</module>
+            </modules>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-failsafe-plugin</artifactId>
+                            <version>${failsafe.plugin.version}</version>
+                            <configuration>
+                                <systemProperties>
+                                    <clover.showUniqueCoverage>true</clover.showUniqueCoverage>
+                                </systemProperties>
+                            </configuration>
+                            <executions>
+                                <execution>
+                                    <id>integration-tests</id>
+                                    <goals>
+                                        <goal>integration-test</goal>
+                                    </goals>
+                                    <phase>integration-test</phase>
+                                    <configuration>
+                                        <encoding>${project.build.sourceEncoding}</encoding>
+                                        <includes>
+                                            <include>**/*IT*</include>
+                                        </includes>
+                                        <argLine>-Dfile.encoding=UTF-8</argLine>
+                                    </configuration>
+                                </execution>
+                            </executions>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
+                <plugins>
+                    <plugin>
+                        <groupId>com.atlassian.maven.plugins</groupId>
+                        <artifactId>clover-maven-plugin</artifactId>
+                        <version>${clover.version}</version>
+                        <configuration>
+                            <generateHistorical>true</generateHistorical>
+                            <historyDir>${clover.history.dir}</historyDir>
+                            <!--<cloverMergeDatabase>${clover.database}</cloverMergeDatabase>-->
+                            <cloverDatabase>${clover.database}</cloverDatabase>
+                            <singleCloverDatabase>true</singleCloverDatabase>
+                            <excludes>
+                                <exclude>**/*Test*</exclude>
+                                <exclude>**/*IT*</exclude>
+                                <!-- leaving out lang as it mostly comes from other sources -->
+                                <exclude>com/stormpath/sdk/lang/*</exclude>
+                                <!-- leaving out MediaType as it's borrowed from Spring -->
+                                <exclude>com/stormpath/sdk/impl/http/MediaType*</exclude>
+                                <!-- leaving out JwtHeaderParameters - it's only used for static fields -->
+                                <exclude>com/stormpath/sdk/impl/jwt/JwtHeaderParameters*</exclude>
+                            </excludes>
+                            <useCloverClassifier>true</useCloverClassifier>
+                            <!--See https://confluence.atlassian.com/display/CLOVERKB/Java+8+code+instrumented+by+Clover+fails+to+compile-->
+                            <instrumentLambda>none</instrumentLambda>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>clover.setup</id>
+                                <phase>process-sources</phase>
+                                <goals>
+                                    <goal>setup</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+            <reporting>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-project-info-reports-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>com.atlassian.maven.plugins</groupId>
+                        <artifactId>clover-maven-plugin</artifactId>
+                        <version>${clover.version}</version>
+                    </plugin>
+                </plugins>
+            </reporting>
         </profile>
         <profile>
             <id>stormpath-signature</id>
@@ -763,5 +905,4 @@
             </build>
         </profile>
     </profiles>
-
 </project>

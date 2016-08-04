@@ -21,18 +21,22 @@ import com.stormpath.sdk.impl.resource.IntegerProperty;
 import com.stormpath.sdk.impl.resource.Property;
 import com.stormpath.sdk.impl.resource.StringProperty;
 
+import java.io.Serializable;
 import java.util.Map;
 
 /**
  * @since 0.1
  */
-public class DefaultError extends AbstractResource implements Error {
+public class DefaultError extends AbstractResource implements Error, Serializable {
+
+    static final long serialVersionUID = 42L;
 
     static final IntegerProperty STATUS = new IntegerProperty("status");
     static final IntegerProperty CODE = new IntegerProperty("code");
     static final StringProperty MESSAGE = new StringProperty("message");
     static final StringProperty DEV_MESSAGE = new StringProperty("developerMessage");
     static final StringProperty MORE_INFO = new StringProperty("moreInfo");
+    public static final StringProperty REQUEST_ID = new StringProperty("requestId");
 
     private static final Map<String, Property> PROPERTY_DESCRIPTORS = createPropertyDescriptorMap(
             STATUS, CODE, MESSAGE, DEV_MESSAGE, MORE_INFO
@@ -40,6 +44,11 @@ public class DefaultError extends AbstractResource implements Error {
 
     public DefaultError(Map<String, Object> body) {
         super(null, body);
+    }
+
+    // Needed for this class to be serializable
+    public DefaultError() {
+        super(null, null);
     }
 
     @Override
@@ -71,4 +80,10 @@ public class DefaultError extends AbstractResource implements Error {
     public String getMoreInfo() {
         return getString(MORE_INFO);
     }
+
+    @Override
+    public String getRequestId() {
+       return getString(REQUEST_ID);
+    }
+
 }

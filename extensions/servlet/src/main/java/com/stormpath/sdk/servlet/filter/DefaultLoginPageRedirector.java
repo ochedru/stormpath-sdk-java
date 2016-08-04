@@ -30,56 +30,42 @@ import java.net.URLEncoder;
  */
 public class DefaultLoginPageRedirector implements LoginPageRedirector {
 
+    private String loginUri;
+
+    public DefaultLoginPageRedirector() {}
+
+    public DefaultLoginPageRedirector(String loginUri) {
+        Assert.hasText(loginUri, "loginUri cannot be null or empty.");
+        this.loginUri = loginUri;
+    }
+
     @Override
-    public void redirectToLoginPage(HttpServletRequest request, HttpServletResponse response, String status)
-        throws Exception {
+    public void redirectToLoginPage(HttpServletRequest request, HttpServletResponse response)
+            throws Exception {
 
-        Config config = ConfigResolver.INSTANCE.getConfig(request.getServletContext());
+        if (loginUri == null) {
+            Config config = ConfigResolver.INSTANCE.getConfig(request.getServletContext());
 
-        Assert.notNull(status, "status argument cannot be null.");
+            //not authenticated, so we'll redirect the user the login url and the 'next' parameter will be equal
+            //to the currently requested URL *if* the request is a GET request.  POST requests are rarely safe to
+            //automatically execute automatically (not idempotent, etc), so we just return to the default login 'nextUrl'
+            //if not a GET
 
-        //not authenticated, so we'll redirect the user the login url and the 'next' parameter will be equal
-        //to the currently requested URL *if* the request is a GET request.  POST requests are rarely safe to
-        //automatically execute automatically (not idempotent, etc), so we just return to the default login 'nextUrl'
-        //if not a GET
-
-        String redirectUrl = config.getLoginUrl();
-        String query = null;
-
-        int i = redirectUrl.indexOf('?');
-        if (i != -1) {
-            if (i == redirectUrl.length() - 1) {
-                query = Strings.EMPTY_STRING;
-            } else {
-                query = redirectUrl.substring(i + 1);
-            }
-        }
-
-        if (query == null) {
-            redirectUrl += "?status=" + status;
-        } else if (!query.contains("status")) {
-
-            if (!query.equals(Strings.EMPTY_STRING)) {
-                redirectUrl += "&";
-            }
-
-            redirectUrl += "status=" + status;
+            loginUri = config.getLoginConfig().getUri();
         }
 
         String method = request.getMethod();
+        String nextUri = loginUri;
+
         if (method.equalsIgnoreCase("GET")) {
 
-            String currentUrlString = request.getRequestURL().toString();
-            query = request.getQueryString();
-            if (query != null) {
-                currentUrlString += "?" + query;
-            }
+            String requestURI = request.getRequestURI() + (Strings.hasText(request.getQueryString()) ? "?" + request.getQueryString() : "");
 
-            String encodedCurrentUrlString = URLEncoder.encode(currentUrlString, "UTF-8");
+            String encodedCurrentUrlString = URLEncoder.encode(requestURI, "UTF-8");
 
-            redirectUrl += "&next=" + encodedCurrentUrlString;
+            nextUri += "?next=" + encodedCurrentUrlString;
         }
 
-        ServletUtils.issueRedirect(request, response, redirectUrl, null, true, true);
+        ServletUtils.issueRedirect(request, response, nextUri, null, true, true);
     }
 }

@@ -21,6 +21,7 @@ import com.stormpath.sdk.account.AccountList;
 import com.stormpath.sdk.account.CreateAccountRequest;
 import com.stormpath.sdk.application.AccountStoreHolder;
 import com.stormpath.sdk.directory.AccountStore;
+import com.stormpath.sdk.directory.Directory;
 import com.stormpath.sdk.group.CreateGroupRequest;
 import com.stormpath.sdk.group.Group;
 import com.stormpath.sdk.resource.Resource;
@@ -30,8 +31,11 @@ import com.stormpath.sdk.directory.Directory;
 import com.stormpath.sdk.group.GroupCriteria;
 import com.stormpath.sdk.group.GroupList;
 import com.stormpath.sdk.resource.Auditable;
+import com.stormpath.sdk.resource.Deletable;
 import com.stormpath.sdk.resource.Extendable;
+import com.stormpath.sdk.resource.Resource;
 import com.stormpath.sdk.resource.ResourceException;
+import com.stormpath.sdk.resource.Saveable;
 import com.stormpath.sdk.tenant.Tenant;
 
 import java.util.Map;
@@ -293,8 +297,9 @@ public interface Organization extends AccountStoreHolder<Organization>, Resource
      * @param mapping the new OrganizationAccountStoreMapping resource to add to the Organization's OrganizationAccountStoreMapping list.
      * @return the newly created OrganizationAccountStoreMapping instance.
      * @throws com.stormpath.sdk.resource.ResourceException
+     * @since 1.0.RC9
      */
-    OrganizationAccountStoreMapping createOrganizationAccountStoreMapping(OrganizationAccountStoreMapping mapping) throws ResourceException;
+    OrganizationAccountStoreMapping createAccountStoreMapping(OrganizationAccountStoreMapping mapping) throws ResourceException;
 
     /**
      * Creates a new {@link OrganizationAccountStoreMapping} for this Organization and appends that
@@ -318,8 +323,7 @@ public interface Organization extends AccountStoreHolder<Organization>, Resource
      * <p/>
      * NOTE: If you already know the account store where the account resides, you can
      * specify it at the time the authentication request is created (for example,
-     * {@link com.stormpath.sdk.authc.UsernamePasswordRequest#UsernamePasswordRequest(String, char[],
-     * com.stormpath.sdk.directory.AccountStore)}).
+     * {@link com.stormpath.sdk.authc.UsernamePasswordRequestBuilder#inAccountStore(AccountStore)}).
      * This way you will be avoiding the authentication attempt to cycle through the Organization's account stores.
      * <p/>
      * <h4>Example</h4>

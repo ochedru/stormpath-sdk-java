@@ -15,19 +15,18 @@
  */
 package com.stormpath.spring.cache
 
-import org.junit.Test
 import org.springframework.cache.concurrent.ConcurrentMapCache
+import org.testng.annotations.Test
 
 import static org.easymock.EasyMock.*
-import static org.junit.Assert.assertNull
-import static org.junit.Assert.assertSame
+import static org.testng.Assert.*
 
 /**
  * @since 0.2.0
  */
 class SpringCacheTest {
 
-    @Test(expected = IllegalArgumentException)
+    @Test(expectedExceptions = IllegalArgumentException)
     void testNullSpringCache() {
         new SpringCache(null)
     }
@@ -86,11 +85,11 @@ class SpringCacheTest {
 
         def val = cache.get(key)
         assertNull val
-        assertNull cache.put(key, prev)
+        assertNotNull cache.put(key, prev)
 
         val = cache.put(key, value)
 
-        assertSame prev, val
+        assertNotSame prev, val
     }
 
     @Test

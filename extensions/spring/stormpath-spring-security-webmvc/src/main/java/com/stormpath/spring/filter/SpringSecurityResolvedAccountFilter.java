@@ -25,17 +25,32 @@ public class SpringSecurityResolvedAccountFilter extends HttpFilter implements I
     @Autowired
     private AuthenticationProvider authenticationProvider;
 
+    private AccountResolver accountResolver = AccountResolver.INSTANCE;
+
     @Override
     protected void filter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
         throws Exception {
 
-        Account account = AccountResolver.INSTANCE.getAccount(request);
+        Account account = accountResolver.getAccount(request);
 
         if (account != null) {
-            Authentication authentication = new ProviderAuthenticationToken(account);
-            authentication = authenticationProvider.authenticate(authentication);
-            SecurityContextHolder.clearContext();
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            Authentication currentAuthentication = SecurityContextHolder.getContext().getAuthentication();
+
+            boolean forceRefresh;
+
+            if (currentAuthentication == null || !(SecurityContextHolder.getContext().getAuthentication().getPrincipal() instanceof String)) {
+                forceRefresh = true;
+            } else {
+                String href = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+                forceRefresh = !href.equals(account.getHref());
+            }
+
+            if (forceRefresh) {
+                Authentication authentication = new ProviderAuthenticationToken(account);
+                authentication = authenticationProvider.authenticate(authentication);
+                SecurityContextHolder.clearContext();
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
         }
 
         chain.doFilter(request, response);

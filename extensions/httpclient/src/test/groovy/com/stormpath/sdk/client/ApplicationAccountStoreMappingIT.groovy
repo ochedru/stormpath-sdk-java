@@ -110,9 +110,8 @@ class ApplicationAccountStoreMappingIT extends ClientIT {
 
         ApplicationAccountStoreMappingList mappings2 = appRefresh.getAccountStoreMappings()
         counter = 0;
-        for(ApplicationAccountStoreMapping mapping : mappings2) {
+        for (ApplicationAccountStoreMapping mapping : mappings2) {
             counter++;
-            //println(mapping)
         }
         assertEquals(counter, 0) //making sure the previous mappings were deleted.
 
@@ -183,6 +182,33 @@ class ApplicationAccountStoreMappingIT extends ClientIT {
         assertNull(defaultAccountStore)
     }
 
+    /**
+     * @since 1.0.RC9
+     */
+    @Test
+    void testAccountStoreMappingsWithQuery() {
+
+        def counter = 2
+        // this will end up being the last entry, which we will retrieve first
+        // proving that our query worked
+        def href
+        3.times {
+            Directory dir = createDirectory()
+            href = dir.href
+            def accountStoreMapping = client.instantiate(ApplicationAccountStoreMapping)
+            accountStoreMapping.setAccountStore(dir)
+            accountStoreMapping.setApplication(app)
+            accountStoreMapping.setDefaultAccountStore(true)
+            accountStoreMapping.setDefaultGroupStore(true)
+            accountStoreMapping.setListIndex(counter--)
+            app.createAccountStoreMapping(accountStoreMapping) //testing ApplicationAccountStoreMapping Create.
+        }
+
+        def mappings = app.getAccountStoreMappings(["orderBy":"listIndex"])
+
+        assertEquals mappings.iterator().next().accountStore.href, href
+    }
+
     @Test
     void testAccountStoreMappingUpdate() {
         5.times { i ->
@@ -195,7 +221,9 @@ class ApplicationAccountStoreMappingIT extends ClientIT {
             app.createAccountStoreMapping(accountStoreMapping)
         }
 
-        def accStrMaps = app.getApplicationAccountStoreMappings(ApplicationAccountStoreMappings.where(ApplicationAccountStoreMappings.listIndex().eq(1)))
+        def accStrMaps = app.getAccountStoreMappings(
+                ApplicationAccountStoreMappings.where(ApplicationAccountStoreMappings.listIndex().eq(1))
+        )
         ApplicationAccountStoreMapping accountStoreMapping = accStrMaps.first()
         AccountStore accountStore = accountStoreMapping.accountStore
         assertNotEquals(accountStore, app.getDefaultAccountStore())
@@ -283,22 +311,34 @@ class ApplicationAccountStoreMappingIT extends ClientIT {
 
     @Test
     void testApplicationAccountStoreMappingCriteria() {
-        2.times { i ->
+
+        def dirHref
+        3.times { i ->
             Directory dir = createDirectory()
+            // dirHref will end up being the last directory name created
+            dirHref = dir.href
             def accountStoreMapping = client.instantiate(ApplicationAccountStoreMapping)
             accountStoreMapping.setAccountStore(dir)
             accountStoreMapping.setApplication(app)
             accountStoreMapping.setDefaultAccountStore(true)   //Should make last one in loop the defaultAccountStore
             accountStoreMapping.setDefaultGroupStore(true)     //Should make last one in loop the defaultGroupStore
+            // reverse order so that the last mapping created will be first out when used with orderByListIndex
+            accountStoreMapping.setListIndex(2-i)
+
             app.createAccountStoreMapping(accountStoreMapping)
         }
-        ApplicationAccountStoreMappingList mappings = app.getApplicationAccountStoreMappings(ApplicationAccountStoreMappings.criteria().withAccountStore().withApplication())
+        ApplicationAccountStoreMappingList mappings = app.getAccountStoreMappings(
+                ApplicationAccountStoreMappings.criteria().withAccountStore().withApplication().orderByListIndex()
+        )
         String mappingsString = mappings.toString()
-        assertTrue(mappingsString.contains("Directory"))
-        assertTrue(mappingsString.contains("name"))
-        assertTrue(mappingsString.contains("description"))
-        assertTrue(mappingsString.contains("loginAttempts"))
-        assertTrue(mappingsString.contains("passwordResetTokens"))
+
+        assertTrue mappingsString.contains("Directory")
+        assertTrue mappingsString.contains("name")
+        assertTrue mappingsString.contains("description")
+        assertTrue mappingsString.contains("loginAttempts")
+        assertTrue mappingsString.contains("passwordResetTokens")
+
+        assertEquals mappings.iterator().next().accountStore.href, dirHref
     }
 
     @Test
