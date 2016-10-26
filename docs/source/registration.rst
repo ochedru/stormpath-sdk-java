@@ -18,7 +18,7 @@ One of the very first things most web apps need is the ability to create a user 
 
 2. Fill out the form and click submit and you'll be redirected back to your application's root path, for example, ``http://localhost:8080/``.
 
-Pretty nice!  Not a single line of code required :)
+Pretty nice!  Not a single line of code required. :)
 
 And while we think the default look and feel of the pages automatically rendered by the plugin are pretty nice, you have full control over the CSS and HTML for these pages - we'll cover customizing them later.
 
@@ -36,6 +36,7 @@ If you want to change this path, set the ``stormpath.web.register.uri`` configur
 
 Next URI
 --------
+**If** ``stormpath.web.register.autoLogin = false`` **, this is the default**
 
 If :ref:`email verification <email verification>` is disabled, a successfully registered user will be automatically redirected to the application's context root (home page) by default.  If you want to change this destination, set the ``stormpath.web.register.nextUri`` configuration property:
 
@@ -43,12 +44,20 @@ If :ref:`email verification <email verification>` is disabled, a successfully re
 
     stormpath.web.register.nextUri = /
 
+**If** ``stormpath.web.register.autoLogin = true``
+
+If :ref:`email verification <email verification>` is disabled, a successfully registered user will be automatically logged in to the application and redirected to the page specified in the ``stormpath.web.login.nextUri`` configuration property:
+
+.. code-block:: properties
+
+    stormpath.web.login.nextUri = /
+
 Again, this property is only referenced if email verification is disabled.  If email verification is enabled, a page will be rendered asking the user to check their email.
 
 Next Query Parameter
 ^^^^^^^^^^^^^^^^^^^^
 
-If :ref:`email verification <email verification>` is disabled and the user is directed to the registration view (by clicking a link or via a redirect), and the URI has a ``next`` query parameter, the ``next`` query parameter value will take precedence as the post-registration redirect location.  For example:
+If :ref:`email verification <email verification>` is disabled and the user is directed to the registration view (by clicking a link or via a redirect), and the URI has a ``next`` query parameter, the ``next`` query parameter value will take precedence as the post-registration redirect location. For example:
 
 ``https://myapp.com/register?next=/registerSuccess``
 
@@ -56,16 +65,43 @@ This will cause the user to be redirected ``/registerSuccess`` instead of the co
 
 Again, this functionality is only executed if email verification is disabled.  If email verification is enabled, a page will be rendered asking the user to check their email.
 
+.. only:: springboot
+
+  View
+  ----
+
+  When the URI is visited a default template view named ``stormpath/register`` is rendered by default.  If you wanted to render your own template instead of the default, you can set the name of the template to render with the ``stormpath.web.register.view`` property:
+
+  .. code-block:: properties
+
+    stormpath.web.register.view = stormpath/register
+
+  Remember that the property value is the *name* of a view, and the effective Spring ``ViewResolver`` will resolve that name to a template file.  See the :ref:`Custom Views <views>` chapter for more information.
+
 Form Fields
 -----------
 
-You can specify a which form fields will be displayed by editing the ``stormpath.web.register.form.fields`` configuration property.  For example, the default value:
+You can specify a which form fields will be displayed by editing the ``stormpath.web.register.form.fields`` configuration property.  For example, the default value for ``givenName`` is:
 
 .. code-block:: properties
 
-    stormpath.web.register.form.fields = givenName, surname, email(required), password(required,password)
+    stormpath.web.register.form.fields.givenName.enabled = true
+    stormpath.web.register.form.fields.givenName.visible = true
+    stormpath.web.register.form.fields.givenName.label = stormpath.web.register.form.fields.givenName.label
+    stormpath.web.register.form.fields.givenName.placeholder = stormpath.web.register.form.fields.givenName.placeholder
+    stormpath.web.register.form.fields.givenName.required = true
+    stormpath.web.register.form.fields.givenName.type = text
 
-The value is a comma-delimited list Stormpath ``Account`` field names and optional form field directives.  The currently supported field names:
+By default the supported directives are:
+
+* ``enabled``: the field is enabled for edit.
+* ``visible``: the field is visible.
+* ``label``: this is the label to display and its value is defined in i18n.properties with the key ``stormpath.web.register.form.fields.givenName.label``.
+* ``placeholder``: this is the placeholder to display and its value is defined in i18n.properties with the key ``stormpath.web.register.form.fields.givenName.placeholder``.
+* ``required``: makes the field required, If the field is blank, the error message is defined in i18n.properties as ``stormpath.web.register.form.fields.email.required``. If the input is invalid the error message is in the i18n.properties with the key ``stormpath.web.register.form.fields.email.invalid``.
+* ``type``: The input type of the field.
+
+By default the supported fields are: (remember to set the directives for each one)
 
 * ``givenName``: person's given name, also known as 'first name' in Western countries.
 * ``middleName``: any middle name(s).
@@ -74,30 +110,67 @@ The value is a comma-delimited list Stormpath ``Account`` field names and option
 * ``email``: the user's email address.  This field is always required.
 * ``password``: the user's password.
 
-Field names may also have directives in parenthesis immediately following the field name:
+You can customize this list of fields, those extra fields will be saved as custom data. The order field is defined in
 
-``fieldName(directive1, directive2, ..., directiveN)``
+.. code-block:: properties
 
-The currently supported directives are:
+    stormpath.web.register.form.fieldOrder = username,givenName,middleName,surname,email,password,confirmPassword
 
-* ``required``: the form field must be populated before the form can be submitted
-* ``password``: the form field is a password field; show ``*`` characters instead of raw password characters
+You can also customize additional directives as necessary, but note:
 
-Fields specified without a directive will be optional (displayed, but not required to be filled in).
+**The** ``email`` **form field is always required.  If you customize your form fields, ensure that you always have at least an** ``email`` **and set it as** ``required`` **.**
 
-So, the above default value indicates that:
+Custom Data
+^^^^^^^^^^^
 
-1. The ``givenName`` form field (first name) will be shown first, but it is optional (no directives)
-2. The ``surname`` form field (last name) will be shown next, but it is optional (no directives)
-3. The ``email`` form field will be shown next and it is required (``required`` directive)
-4. The ``password`` form field will be shown last, and it is required and a password field (show stars instead of raw characters).
+The registration form provides the ability to have custom fields defined by the developer. The registration controller will
+automatically figure out which are those fields (i.e not part of the pre-defined properties supported by the Account) and
+they will be added as `Custom Data`_ in the account.
 
-You can customize this list with optional directives as necessary, but note:
+For example, let's suppose we want to add a custom field to capture a user's birthday during registration. Then the
+following properties should be added to the ``stormpath.properties`` file:
 
-**The** ``email`` **form field is always required.  If you customize your form fields, ensure that you always have at least an** ``email(required)`` **list entry.**
+.. code-block:: properties
 
-.. TIP::
-    Re-ordering the comma-delimited list will automatically re-order the fields in the view :)
+    stormpath.web.register.form.fields.birthday.type = text
+    stormpath.web.register.form.fields.birthday.label = Birthday
+    stormpath.web.register.form.fields.birthday.enabled = true
+    stormpath.web.register.form.fields.birthday.visible = true
+    stormpath.web.register.form.fields.birthday.required = true
+    stormpath.web.register.form.fields.birthday.placeholder = Birthday
+
+When the registration form is rendered, this field will be added to the bottom of the form.
+
+   .. image:: /_static/register-with-birthday.png
+
+When the form is submitted, the field's name and value will be added to the account's custom data.
+
+If you want to provide user's with a good internationalization experience, then you should define the label property like this:
+
+.. code-block:: properties
+
+    stormpath.web.register.form.fields.birthday.label = stormpath.web.register.form.fields.birthday.label
+
+And then, in your ``i18n_en.properties`` file you would add:
+
+.. code-block:: properties
+
+    stormpath.web.register.form.fields.birthday.label = Birthday
+
+While in your tentative ``i18n_es.properties`` file you would add:
+
+.. code-block:: properties
+
+    stormpath.web.register.form.fields.birthday.label = Fecha de nacimiento
+
+.. _password strength:
+
+Password Strength
+^^^^^^^^^^^^^^^^^
+
+When you first fill out the registration form, you probably noticed that you couldn't register a user account without specifying a sufficiently strong password.  This is because, by default, Stormpath enforces certain password strength rules.
+
+If you'd like to change these password strength rules, you can do so easily by visiting the `Stormpath Admin Console`_, navigating to your your application's user account ``Directory``, and then changing the "Password Strength Policy".
 
 i18n
 ----
@@ -106,7 +179,7 @@ The :ref:`i18n` message keys used in the default register view have names prefix
 
 .. literalinclude:: ../../extensions/servlet/src/main/resources/com/stormpath/sdk/servlet/i18n.properties
    :language: properties
-   :lines: 42-70
+   :lines: 49-87
 
 For more information on customizing i18n messages and adding bundle files, please see :ref:`i18n`.
 
@@ -136,7 +209,7 @@ If you want to enable email verification for newly registered accounts, you have
 #. On the Directory Workflows screen, the 'Verification Email' workflow is shown first.  Ensure that you
 
    #. Enable the workflow, and
-   #. Change the 'Link Base URL' text field to equal the fully qualified URL of your application's :ref:`verify link base URL <verify link base url>`.  The plugin's default context-relative path for this feature is ``/verify``, implying a base URL (for example, during localhost testing) of ``http://localhost:8080/verify``.
+   #. Change the 'Link Base URL' text field to equal the fully qualified URL of your application's :ref:`verify link base URL <verify link base url>`.  The default context-relative path for this feature is ``/verify``, implying a base URL (for example, during localhost testing) of ``http://localhost:8080/verify``.
 
    .. image:: /_static/console-directory-workflows-ann.png
 
@@ -149,17 +222,22 @@ Try it!
 
    .. image:: /_static/register.png
 
-#. Fill out the form and click submit and you'll be shown a success view:
+#. Fill out the form and click submit, your account will be created with ``UNVERIFIED`` or ``ENABLED`` status depending on your `Directory Workflow <http://docs.stormpath.com/console/product-guide/#directory-workflows>`_:
 
-   .. image:: /_static/register-verify.png
+    * Account status ``UNVERIFIED``:
+        You will be redirected to the :ref:`login page <login>` with ``?status=unverified`` and you will receive a verification email.
 
-#. Open your email and, depending on your "Account Email Verification" email template, you should see an email that looks like the following:
+        A) Open your email and, depending on your "Account Email Verification" email template, you should see an email that looks like the following:
 
-   .. image:: /_static/register-verify-email.png
+           .. image:: /_static/register-verify-email.png
 
-#. Click the link in the email and it will take you to a ``/verify`` path.  This will verify your email address and immediately redirect you to the login page, allowing you to login with the new (and verified) account:
+        B) Click the link in the email and it will take you to a ``/verify`` path.  This will verify your email address and redirect you to the :ref:`Verify Next URI`
 
-   .. image:: /_static/login-verified.png
+            .. image:: /_static/login-verified.png
+
+    * Account status ``ENABLED``:
+        If ``autoLogin`` is true the application will log you in and redirect to register 'next' URI.
+        If false you will be redirected to the :ref:`login page <login>` with ``?status=created``.
 
 .. _verify link base url:
 
@@ -168,7 +246,7 @@ Verify Link Base URL
 
 The Verify 'Link Base URL' mentioned above is the fully qualified base URL used to generate a unique link the user will click when reading the email.  For example, during development, this is often something like ``http://localhost:8080/verify`` and in production, something like ``https://myapp.com/verify``.
 
-When a user clicks the link in the email, the Stormpath Java Servlet Plugin will automatically process the resulting request.  By default, the context-relative path that will process these requests is ``/verify`` as the above link examples show.  This path is controlled via the ``stormpath.web.verifyEmail.uri`` configuration property:
+When a user clicks the link in the email, the |project| will automatically process the resulting request.  By default, the context-relative path that will process these requests is ``/verify`` as the above link examples show.  This path is controlled via the ``stormpath.web.verifyEmail.uri`` configuration property:
 
 .. code-block:: properties
 
@@ -184,15 +262,25 @@ You can change the value to reflect a different path if you wish.
 Verify Next URI
 ^^^^^^^^^^^^^^^
 
-When the user clicks the email verification link and the request is processed by the the ``stormpath.web.verifyEmail.uri`` path, the user will be immediately redirected to a 'next' URI.  By default, this URI is the :ref:`login page <login>` as controlled by the ``stormpath.web.verifyEmail.nextUri`` configuration property:
+When the user clicks the email verification link and the request is processed by the the ``stormpath.web.verifyEmail.uri`` path, the user will be:
 
-.. code-block:: properties
+    * If ``autoLogin`` is false (this is the default), redirected to a 'next' URI.  By default, this URI is the :ref:`login page <login>` as controlled by the ``stormpath.web.verifyEmail.nextUri`` configuration property:
 
-    stormpath.web.verifyEmail.nextUri = /login?status=verified
+        .. code-block:: properties
 
-As you can see, this URI has a ``status=verified`` query parameter.  The plugin's default login view will recognize the query parameter and show the user a nice message explaining that their account has been verified and that they can log in:
+            stormpath.web.verifyEmail.autoLogin = false
+            stormpath.web.verifyEmail.nextUri = /login?status=verified
 
-.. image:: /_static/login-verified.png
+        As you can see, this URI has a ``status=verified`` query parameter.  The plugin's default login view will recognize the query parameter and show the user a nice message explaining that their account has been verified and that they can log in:
+
+        .. image:: /_static/login-verified.png
+
+    * If ``autoLogin`` is true, the verification workflow will login the user and redirect to ``login.nextUri``
+
+        .. code-block:: properties
+
+            stormpath.web.verifyEmail.autoLogin = true
+            stormpath.web.login.nextUri = /
 
 Events
 ------
@@ -212,3 +300,4 @@ A ``VerifiedAccountRequestEvent`` will be published when processing an HTTP requ
 Naturally, **this event is only published if** :ref:`email verification <email verification>` **is enabled.**
 
 .. _Stormpath Admin Console: https://api.stormpath.com
+.. _Custom Data: http://docs.stormpath.com/java/product-guide/#custom-data

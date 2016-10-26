@@ -19,6 +19,7 @@ import com.stormpath.sdk.account.Account;
 import com.stormpath.sdk.account.AccountCriteria;
 import com.stormpath.sdk.account.AccountList;
 import com.stormpath.sdk.account.CreateAccountRequest;
+import com.stormpath.sdk.account.AccountLinker;
 import com.stormpath.sdk.application.AccountStoreHolder;
 import com.stormpath.sdk.directory.AccountStore;
 import com.stormpath.sdk.directory.Directory;
@@ -50,7 +51,7 @@ import java.util.Map;
  *
  * @since 1.0.RC7
  */
-public interface Organization extends AccountStoreHolder<Organization>, Resource, Saveable, Deletable, AccountStore, Extendable, Auditable {
+public interface Organization extends AccountStoreHolder<Organization>, Resource, Saveable, Deletable, AccountStore, Extendable, Auditable, AccountLinker {
 
     /**
      * Returns this Organization's name. The name is guaranteed to be non-null and unique in the owning Tenant.
