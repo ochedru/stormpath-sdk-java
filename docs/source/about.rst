@@ -3,13 +3,15 @@
 About
 =====
 
-Are you building a web application, but not sure if the |project| is right for you?  This page will help you decide if is a good fit!
+Are you building a web $apptype, but not sure if the |project| is right for you?  This page will help you decide
+if is a good fit!
 
 
 What is Stormpath?
 ------------------
 
-`Stormpath`_ is a reliable, scalable API service for managing users, authentication and authorization. Stormpath allows your web application to do things like:
+`Stormpath`_ is a reliable, scalable API service for managing users, authentication and authorization. Stormpath allows
+your web application to do things like:
 
 - Create user accounts.
 - Edit user accounts.
@@ -28,24 +30,29 @@ What is Stormpath?
 
 Stormpath provides a simple REST API for all of the above.  For instance, if you wanted to create a new user account given an email address and password, you could send Stormpath an ``HTTP POST`` request and Stormpath would create a new user account for you, securely hash its password using security best practices and and store it securely in Stormpath's cloud service.
 
-In addition to allowing you to create users and groups, Stormpath also allows you to store custom data with each user account.  Let's say you want to store a user's birthday -- you can send Stormpath an ``HTTP POST`` request to the user's account URL and store *any* variable JSON data (birthdays, images, movies, links, etc.).  This information is encrypted and authenticated end-to-end, ensuring your user data is secure.
+In addition to allowing you to create users and groups, Stormpath also allows you to store custom data with each user account.  Let's say you want to store a user's birthday -- you can send Stormpath an ``HTTP POST`` request to the user's account URL and store *any* variable JSON data (birthdays, images, movies, links, etc.).  This information is cryptographically verifiable and is authenticated end-to-end, ensuring your user data is secure.
 
 What is the |project|?
 ----------------------
 
-.. only:: servlet
+#if( $servlet )
 
-  The |project| is a drop-in plugin for `Servlet`_-based web applications that makes it *incredibly* simple to add user management and authentication to your Java-based web application.
+The |project| is a drop-in plugin for Servlet-based web applications that makes it *incredibly* simple to add user management and authentication to your Java-based web application.
 
-.. only:: springboot
+#elseif( $sczuul )
 
-  It aims to completely automate all user registration, login, authentication and authorization workloads as well as properly secure the web app.  It is completely flexible - use only the functionality you need or leverage the entire feature set.
+.. include:: about_sczuul.rst
 
+#else
+
+The |project| aims to completely automate all user registration, login, authentication and authorization workloads as well as properly secure your web $apptype.  It is completely flexible - use only the functionality you need or leverage the entire feature set.
+
+#end
 
 Who should use Stormpath?
 -------------------------
 
-Stormpath is a powerful and secure service.  The Stormpath Java Servlet Plugin makes it even easier to use in servlet-based web applications on the JVM, but it might not be for everyone!
+Stormpath is a powerful and secure service.  The |project| makes it even easier to use in ${apptype}s on the JVM, but it might not be for everyone!
 
 You might want to use Stormpath if:
 
@@ -57,7 +64,7 @@ You might want to use Stormpath if:
 - You would like to configure and customize password strength rules.
 - You'd like to keep your user data separate from your other applications to increase platform stability / availability.
 - You are building a service oriented application or using a microservices based architecture, in which multiple independent services need access to the same user data.
-- You who would like to use Stormpath, but need to host it yourself (Stormpath has private and on-premise editions you can use internally).
+- You would like to use Stormpath, but need to host it yourself (Stormpath has private and on-premise editions you can use internally).
 
 **Stormpath is a great match for applications of any size where security, development speed, and simplicity are top priorities.**
 
@@ -74,4 +81,3 @@ Want to use Stormpath?  OK, great!  Let's get started!
 .. _Stormpath: https://stormpath.com/
 .. _Facebook: https://www.facebook.com/
 .. _Google: https://www.google.com/
-.. _Servlet: https://jcp.org/aboutJava/communityprocess/final/jsr315/

@@ -16,14 +16,16 @@
 package com.stormpath.sdk.servlet.mvc
 
 import com.stormpath.sdk.account.Account
+import com.stormpath.sdk.account.AccountStatus
 import com.stormpath.sdk.application.Application
+import com.stormpath.sdk.cache.Cache
+import com.stormpath.sdk.cache.CacheManager
 import com.stormpath.sdk.client.Client
 import com.stormpath.sdk.directory.CustomData
 import com.stormpath.sdk.directory.Directory
 import com.stormpath.sdk.group.Group
 import com.stormpath.sdk.impl.account.DefaultAccount
 import com.stormpath.sdk.impl.directory.DefaultDirectory
-import com.stormpath.sdk.impl.ds.InternalDataStore
 import com.stormpath.sdk.impl.group.DefaultGroup
 import com.stormpath.sdk.impl.organization.DefaultOrganization
 import com.stormpath.sdk.organization.Organization
@@ -47,7 +49,6 @@ import javax.servlet.http.HttpServletResponse
 import static org.easymock.EasyMock.anyObject
 import static org.easymock.EasyMock.createMock
 import static org.easymock.EasyMock.createNiceMock
-import static org.easymock.EasyMock.createStrictMock
 import static org.easymock.EasyMock.expect
 import static org.easymock.EasyMock.partialMockBuilder
 import static org.easymock.EasyMock.replay
@@ -131,6 +132,49 @@ public class RegisterControllerTest {
         verify eventPublisher, registerPreHandler, request, response, client, requestFieldValueResolver, application, account, accountStoreResolver, directory
 
         assertNotNull(vm, "ViewModel should not be empty")
+    }
+
+    @Test
+    void testAccountUnverifiedRemovedFromCache() {
+        def HREF = "a real href"
+        def cacheManager = createMock(CacheManager)
+        def cache = createMock(Cache)
+
+        RegisterController registerController = new RegisterController(
+            client: client,
+            preRegisterHandler: registerPreHandler,
+            csrfTokenManager: csrfTokenManager,
+            fieldValueResolver: requestFieldValueResolver,
+            produces: Arrays.asList(MediaType.TEXT_HTML),
+            eventPublisher: eventPublisher,
+            accountStoreResolver: accountStoreResolver
+        )
+
+        expect(client.instantiate(Account.class)).andReturn account
+        expect(requestFieldValueResolver.getAllFields(request)).andReturn new HashMap<String, Object>()
+        expect(request.getAttribute(Application.class.getName())).andReturn ((Application)application)
+        expect(accountStoreResolver.getAccountStore(request, response)).andReturn directory
+        expect(registerPreHandler.handle(request, response, account)).andReturn true
+        expect(account.setGivenName("UNKNOWN")).andReturn account
+        expect(account.setSurname("UNKNOWN")).andReturn account
+        expect(account.getStatus()).andReturn AccountStatus.UNVERIFIED
+        expect(account.getHref()).andReturn HREF
+        expect(account.getCustomData()).andReturn customData
+        expect(directory.createAccount(account)).andReturn account
+        expect(eventPublisher.publish(anyObject()))
+
+        expect(request.getAttribute(UserAgents.USER_AGENT_REQUEST_ATTRIBUTE_NAME)).andReturn new DefaultUserAgent(request)
+        expect(request.getHeader("Accept")).andReturn "text/html"
+
+        expect(client.getCacheManager()).andReturn cacheManager
+        expect(cacheManager.getCache(Account.class.name)).andReturn cache
+        expect(cache.remove(HREF)).andReturn(cache).once()
+
+        replay eventPublisher, registerPreHandler, request, response, client, cacheManager, cache, requestFieldValueResolver, application, account, accountStoreResolver, directory
+
+        def vm = registerController.onValidSubmit(request, response, form)
+
+        verify eventPublisher, registerPreHandler, request, response, client, cacheManager, cache, requestFieldValueResolver, application, account, accountStoreResolver, directory
     }
 
     @Test(expectedExceptions = [IllegalStateException])
@@ -336,25 +380,32 @@ public class RegisterControllerTest {
 
     @Test
     void testAccountProperties() {
-        //We need to be sure that every non-standard account property is properly considered to be custom data
-        //Since there is now way to identify them automatically they have been hardcoded in RegisterController#ACCOUNT_PROPERTIES
-        //This test checks that this list is accurate.
-        //If the simple properties ever change in the account and this test fails then be sure to update RegisterController#ACCOUNT_PROPERTIES
-        //in order to allow this test to pass.
-
+        // We need to be sure that every non-standard account property is properly considered to be custom data
+        // Since there is no way to identify them automatically they have been hardcoded in RegisterController#ACCOUNT_PROPERTIES
+        // This test checks that this list is accurate.
+        //
+        // If the simple properties ever change in the account and this test fails then be sure to update RegisterController#ACCOUNT_PROPERTIES
+        // in order to allow this test to pass.
+        //
+        // per https://github.com/stormpath/stormpath-sdk-java/issues/1097, confirmPassword is a special case.
+        // It needs to exist in RegisterController to ensure it's not added to customData, but it is NOT part of the
+        // defaultAccount.PROPERTY_DESCRIPTORS
         final List<String> NON_SIMPLE_PROPERTIES = Collections.unmodifiableList(Arrays.asList(
-                "fullName", "status", "customData", "emailVerificationToken", "directory", "tenant",
+                "fullName", "status", "customData", "emailVerificationToken", "emailVerificationStatus","directory", "tenant",
                 "providerData", "groups", "groupMemberships", "apiKeys", "applications", "accessTokens",
-                "refreshTokens", "accountLinks", "linkedAccounts", "phones", "factors"));
+                "refreshTokens", "accountLinks", "linkedAccounts", "phones", "factors", "passwordModifiedAt"))
 
-        def defaultAccount = new DefaultAccount(createStrictMock(InternalDataStore));
-        def actualSimpleProperties = defaultAccount.PROPERTY_DESCRIPTORS
-        for (String property : NON_SIMPLE_PROPERTIES) {
-            actualSimpleProperties.remove(property)
-        }
+        def actualSimpleProperties = DefaultAccount.PROPERTY_DESCRIPTORS.keySet().asList()
+        actualSimpleProperties.removeAll(NON_SIMPLE_PROPERTIES)
 
-        actualSimpleProperties = actualSimpleProperties.keySet().asList()
+        def registerControllerProperties = new ArrayList<>(RegisterController.ACCOUNT_PROPERTIES);
 
-        Assert.assertTrue(actualSimpleProperties.containsAll(RegisterController.ACCOUNT_PROPERTIES) && RegisterController.ACCOUNT_PROPERTIES.containsAll(actualSimpleProperties))
+        // When we subtract actualSimpleProperties from RegisterController.ACCOUNT_PROPERTIES, the only thing that should
+        // be left is confirmPassword
+        registerControllerProperties.removeAll(actualSimpleProperties)
+
+        Assert.assertTrue(registerControllerProperties.size() == 1 && "confirmPassword" == registerControllerProperties.get(0))
+
+        Assert.assertTrue(RegisterController.ACCOUNT_PROPERTIES.containsAll(actualSimpleProperties))
     }
 }

@@ -33,15 +33,17 @@ import org.joda.time.DateTimeZone
 import org.testng.annotations.Test
 
 import static com.stormpath.sdk.impl.challenge.TOTPService.getTotpPassword
-import static org.testng.AssertJUnit.*
+import static org.testng.Assert.assertEquals
+import static org.testng.Assert.assertTrue
+import static org.testng.Assert.assertNotNull
 
 /**
  * @since 1.1.0
  */
-class GoogleAuthenticatorChallengeIT extends AbstractMultiFactorIT{
+class GoogleAuthenticatorChallengeIT extends AbstractMultiFactorIT {
 
     @Test
-    void testSuccessfulGoogleAuthenticatorChallenge() {
+    void testSuccessfulGoogleAuthenticatorChallengeWithCode() {
         Directory dir = client.instantiate(Directory)
         dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
@@ -58,6 +60,24 @@ class GoogleAuthenticatorChallengeIT extends AbstractMultiFactorIT{
         assertGoogleAuthenticatorChallengeResponse(factor, getCurrentValidCode(factor), 'SUCCESS')
     }
 
+    @Test
+    void testSuccessfulGoogleAuthenticatorChallengeTwoStep() {
+        Directory dir = client.instantiate(Directory)
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir = client.currentTenant.createDirectory(dir);
+        deleteOnTeardown(dir)
+        Account account = createTempAccountInDir(dir)
+
+        def randomAccountName = uniquify("Random Account Name")
+        def randomIssuer = uniquify("Random Issuer")
+        def factor = createGoogleAuthenticatorFactor(account, randomIssuer, randomAccountName)
+        assertGoogleAuthenticatorFactorFields(factor, randomIssuer, randomAccountName)
+
+        sleepToAvoidCrossingThirtySecondMark()
+
+        GoogleAuthenticatorChallenge challenge = createChallengeWithCode(factor)
+        assertTrue challenge.validate(getCurrentValidCode(factor))
+    }
 
     @Test
     void testGoogleAuthenticatorChallengeWithGarbageCode() {
@@ -73,7 +93,7 @@ class GoogleAuthenticatorChallengeIT extends AbstractMultiFactorIT{
 
         Throwable e = null
         try {
-            createChallenge(factor, "bogus")
+            createChallengeWithCode(factor, "bogus")
         } catch (ResourceException re) {
             e = re
             assertEquals(re.status, 400)
@@ -96,7 +116,7 @@ class GoogleAuthenticatorChallengeIT extends AbstractMultiFactorIT{
 
         Throwable e = null
         try {
-            createChallenge(factor, "123456")
+            createChallengeWithCode(factor, "123456")
         } catch (ResourceException re) {
             e = re
             assertEquals(re.status, 400)
@@ -125,7 +145,7 @@ class GoogleAuthenticatorChallengeIT extends AbstractMultiFactorIT{
 
     private void assertGoogleAuthenticatorChallengeResponse(GoogleAuthenticatorFactor factor, String code, String status, String verificationStatus = 'VERIFIED') {
         String factorHref = factor.href
-        GoogleAuthenticatorChallenge challenge = createChallenge(factor, code)
+        GoogleAuthenticatorChallenge challenge = createChallengeWithCode(factor, code)
         assertInitialChallengeFields(challenge, status, false)
 
         FactorOptions options = Factors.options().withChallenges().withMostRecentChallenge()
@@ -180,9 +200,15 @@ class GoogleAuthenticatorChallengeIT extends AbstractMultiFactorIT{
         sleep(secondsToWait * 1000)
     }
 
-    private GoogleAuthenticatorChallenge createChallenge(GoogleAuthenticatorFactor factor, String code = null) {
+    private GoogleAuthenticatorChallenge createChallengeWithCode(GoogleAuthenticatorFactor factor, String code = null) {
         def challenge = client.instantiate(GoogleAuthenticatorChallenge.class)
         challenge.setCode(code)
+        ChallengeOptions options = Challenges.GOOGLE_AUTHENTICATOR.options().withFactor()
+        return factor.createChallenge(Challenges.GOOGLE_AUTHENTICATOR.newCreateRequestFor(challenge).withResponseOptions(options).build())
+    }
+
+    private GoogleAuthenticatorChallenge createChallengeWithoutCode(GoogleAuthenticatorFactor factor) {
+        def challenge = client.instantiate(GoogleAuthenticatorChallenge.class)
         ChallengeOptions options = Challenges.GOOGLE_AUTHENTICATOR.options().withFactor()
         return factor.createChallenge(Challenges.GOOGLE_AUTHENTICATOR.newCreateRequestFor(challenge).withResponseOptions(options).build())
     }

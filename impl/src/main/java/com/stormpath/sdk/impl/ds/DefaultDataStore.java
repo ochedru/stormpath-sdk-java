@@ -17,10 +17,10 @@ package com.stormpath.sdk.impl.ds;
 
 import com.stormpath.sdk.api.ApiKey;
 import com.stormpath.sdk.cache.CacheManager;
-import com.stormpath.sdk.impl.api.ApiKeyResolver;
-import com.stormpath.sdk.impl.authc.credentials.ClientCredentials;
 import com.stormpath.sdk.http.HttpMethod;
+import com.stormpath.sdk.impl.api.ApiKeyResolver;
 import com.stormpath.sdk.impl.authc.credentials.ApiKeyCredentials;
+import com.stormpath.sdk.impl.authc.credentials.ClientCredentials;
 import com.stormpath.sdk.impl.cache.DisabledCacheManager;
 import com.stormpath.sdk.impl.ds.api.ApiKeyQueryFilter;
 import com.stormpath.sdk.impl.ds.api.DecryptApiKeySecretFilter;
@@ -41,10 +41,14 @@ import com.stormpath.sdk.impl.http.Response;
 import com.stormpath.sdk.impl.http.support.DefaultCanonicalUri;
 import com.stormpath.sdk.impl.http.support.DefaultRequest;
 import com.stormpath.sdk.impl.http.support.UserAgent;
+import com.stormpath.sdk.impl.oauth.OAuthTokenRevoked;
+import com.stormpath.sdk.impl.provider.IdentityProviderType;
 import com.stormpath.sdk.impl.query.DefaultCriteria;
 import com.stormpath.sdk.impl.query.DefaultOptions;
 import com.stormpath.sdk.impl.resource.AbstractResource;
 import com.stormpath.sdk.impl.resource.ReferenceFactory;
+import com.stormpath.sdk.impl.util.BaseUrlResolver;
+import com.stormpath.sdk.impl.util.DefaultBaseUrlResolver;
 import com.stormpath.sdk.impl.util.StringInputStream;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.lang.Collections;
@@ -70,6 +74,7 @@ import java.util.Scanner;
 import java.util.TreeMap;
 
 import static com.stormpath.sdk.impl.http.HttpHeaders.STORMPATH_AGENT;
+import static com.stormpath.sdk.impl.http.HttpHeaders.STORMPATH_CLIENT_REQUEST_ID;
 
 /**
  * @since 0.1
@@ -98,7 +103,6 @@ public class DefaultDataStore implements InternalDataStore {
 
     private static final boolean COLLECTION_CACHING_ENABLED = false; //EXPERIMENTAL - set to true only while developing.
 
-    private final String baseUrl;
     private final RequestExecutor requestExecutor;
     private final ResourceFactory resourceFactory;
     private final MapMarshaller mapMarshaller;
@@ -108,6 +112,7 @@ public class DefaultDataStore implements InternalDataStore {
     private final QueryStringFactory queryStringFactory;
     private final List<Filter> filters;
     private final ApiKeyResolver apiKeyResolver;
+    private final BaseUrlResolver baseUrlResolver;
 
     /**
      * @since 1.0.RC3
@@ -132,19 +137,20 @@ public class DefaultDataStore implements InternalDataStore {
      * @since 1.1.0
      */
     public DefaultDataStore(RequestExecutor requestExecutor, String baseUrl, ApiKeyCredentials apiKeyCredentials, ApiKeyResolver apiKeyResolver) {
-        this(requestExecutor, baseUrl, apiKeyCredentials, apiKeyResolver, new DisabledCacheManager());
+        this(requestExecutor, new DefaultBaseUrlResolver(baseUrl), apiKeyCredentials, apiKeyResolver, new DisabledCacheManager());
     }
 
     /**
-     * @since 1.1.0
+     * @since 1.2.0
      */
-    public DefaultDataStore(RequestExecutor requestExecutor, String baseUrl, ClientCredentials clientCredentials, ApiKeyResolver apiKeyResolver, CacheManager cacheManager) {
-        Assert.notNull(baseUrl, "baseUrl cannot be null");
+    public DefaultDataStore(RequestExecutor requestExecutor, BaseUrlResolver baseUrlResolver, ClientCredentials clientCredentials, ApiKeyResolver apiKeyResolver, CacheManager cacheManager) {
+        Assert.notNull(baseUrlResolver, "baseUrlResolver cannot be null");
         Assert.notNull(requestExecutor, "RequestExecutor cannot be null.");
-        Assert.notNull(clientCredentials, "apiKeyResolver cannot be null.");
+        Assert.notNull(clientCredentials, "clientCredentials cannot be null.");
+        Assert.notNull(apiKeyResolver, "apiKeyResolver cannot be null.");
         Assert.notNull(cacheManager, "CacheManager cannot be null.  Use the DisabledCacheManager if you wish to turn off caching.");
         this.requestExecutor = requestExecutor;
-        this.baseUrl = baseUrl;
+        this.baseUrlResolver = baseUrlResolver;
         this.cacheManager = cacheManager;
         this.resourceFactory = new SubtypeDispatchingResourceFactory(this);
         this.mapMarshaller = new JacksonMapMarshaller();
@@ -164,8 +170,8 @@ public class DefaultDataStore implements InternalDataStore {
         }
 
         if (isCachingEnabled()) {
-            this.filters.add(new ReadCacheFilter(this.baseUrl, this.cacheResolver, COLLECTION_CACHING_ENABLED));
-            this.filters.add(new WriteCacheFilter(this.cacheResolver, COLLECTION_CACHING_ENABLED, referenceFactory));
+            this.filters.add(new ReadCacheFilter(this.baseUrlResolver, this.cacheResolver, COLLECTION_CACHING_ENABLED));
+            this.filters.add(new WriteCacheFilter(this.baseUrlResolver, this.cacheResolver, COLLECTION_CACHING_ENABLED, referenceFactory));
         }
 
         if(clientCredentials instanceof ApiKeyCredentials) {
@@ -270,21 +276,23 @@ public class DefaultDataStore implements InternalDataStore {
         Assert.notEmpty(idClassMap, "idClassMap cannot be null or empty.");
 
         ResourceDataResult result = getResourceData(href, parent, null);
-        Map<String,?> data = result.getData();
+        Map<String, ?> data = result.getData();
 
-        if (Collections.isEmpty(data)) {
+        if (Collections.isEmpty(data) || !data.containsKey(childIdProperty)) {
             throw new IllegalStateException(childIdProperty + " could not be found in: " + data + ".");
         }
 
-        String childClassName = null;
-        Object val = data.get(childIdProperty);
-        if (val != null) {
-            childClassName = String.valueOf(val);
+        Object propertyValue = data.get(childIdProperty);
+        if (propertyValue == null) {
+            throw new IllegalStateException("No Class mapping could be found for " + childIdProperty + ".");
         }
-        Class<? extends R> childClass = idClassMap.get(childClassName);
+
+        Class<? extends R> childClass = idClassMap.get(propertyValue.toString());
 
         if (childClass == null) {
-            throw new IllegalStateException("No Class mapping could be found for " + childIdProperty + ".");
+            childClass = idClassMap.get(IdentityProviderType.DEFAULT.getNameKey());
+            Assert.state(childClass != null, "No Class mapping could be found to instantiate resource.");
+            log.warn("Could not find class for '{}' with value '{}'. Using '{}' as fallback.", childIdProperty, propertyValue, childClass);
         }
 
         return instantiate(childClass, data, result.getUri().getQuery());
@@ -449,6 +457,8 @@ public class DefaultDataStore implements InternalDataStore {
                     // Fix for https://github.com/stormpath/stormpath-sdk-java/issues/218
                     if ( response.getHttpStatus() == 202 ) { //202 means that the request has been accepted for processing, but the processing has not been completed. Therefore we do not have a response body.
                         responseBody = java.util.Collections.emptyMap();
+                    } else if(response.getHttpStatus() == 200 && OAuthTokenRevoked.class.isAssignableFrom(returnType)) {
+                        responseBody = java.util.Collections.emptyMap();
                     } else {
                         throw new IllegalStateException("Unable to obtain resource data from the API server.");
                     }
@@ -557,7 +567,7 @@ public class DefaultDataStore implements InternalDataStore {
      */
     @Override
     public String getBaseUrl() {
-        return this.baseUrl;
+        return this.baseUrlResolver.getBaseUrl();
     }
 
     /**
@@ -621,6 +631,11 @@ public class DefaultDataStore implements InternalDataStore {
                 request.getHeaders().setContentType(MediaType.APPLICATION_JSON);
             }
         }
+
+        List<String> clientRequestId;
+        if (headerMap != null && ((clientRequestId = headerMap.get(STORMPATH_CLIENT_REQUEST_ID)) != null)) {
+            request.getHeaders().put(STORMPATH_CLIENT_REQUEST_ID, clientRequestId);
+        }
     }
 
     protected CanonicalUri canonicalize(String href, Map<String,?> queryParams) {
@@ -663,7 +678,7 @@ public class DefaultDataStore implements InternalDataStore {
     }
 
     protected String qualify(String href) {
-        StringBuilder sb = new StringBuilder(this.baseUrl);
+        StringBuilder sb = new StringBuilder(this.baseUrlResolver.getBaseUrl());
         if (!href.startsWith("/")) {
             sb.append("/");
         }

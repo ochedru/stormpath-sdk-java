@@ -28,17 +28,20 @@ import com.stormpath.sdk.impl.multifactor.AbstractMultiFactorIT
 import com.stormpath.sdk.resource.ResourceException
 import org.testng.annotations.Test
 
-import static org.testng.AssertJUnit.*
+import static org.testng.Assert.assertEquals
+import static org.testng.Assert.assertFalse
+import static org.testng.Assert.assertNotNull
+import static org.testng.Assert.assertTrue
 
 /**
  * @since 1.1.0
  */
-class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
+class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT {
 
     @Test
     void testQueryMultipleFactorsWithPotentiallyMissingProperties() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -50,33 +53,33 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
         createSmsFactor(account, VALID_PHONE_NUMBER)
 
         def factors = account.getFactors(Factors.criteria().limitTo(50).offsetBy(0).orderByCreatedAt());
-        assertEquals(factors.iterator().next().account.materialized, false)
+        assertFalse(factors.iterator().next().account.materialized)
 
-        factors = account.getFactors(Factors.SMS.criteria().withPhone().withAccount().limitTo(50).offsetBy(0).orderByCreatedAt());
-        assertEquals(factors.iterator().next().account.materialized, true)
-        assertEquals(factors.iterator().next().phone.materialized, true)
-        assertEquals(factors.getProperty("items").size, 1);
+        factors = account.getFactors(Factors.SMS.criteria().withPhone().withAccount().limitTo(50).offsetBy(0).orderByCreatedAt())
+        assertTrue(factors.iterator().next().account.materialized)
+        assertTrue(factors.iterator().next().phone.materialized)
+        assertEquals(factors.getProperty("items").size, 1)
 
         List<Factor> factorsAsList = factors.asList()
-        for(Factor currentFactor : factorsAsList){
-            if(currentFactor instanceof SmsFactor){
-                assertEquals(currentFactor.phone.number,VALID_PHONE_NUMBER)
+        for (Factor currentFactor : factorsAsList) {
+            if (currentFactor instanceof SmsFactor) {
+                assertEquals(currentFactor.phone.number, VALID_PHONE_NUMBER)
             }
         }
 
         factors = account.getFactors(Factors.SMS.criteria().withPhone().limitTo(50).offsetBy(0).orderByCreatedAt());
-        assertEquals(factors.getProperty("items").size,1)
+        assertEquals(factors.getProperty("items").size, 1)
         assertEquals(factors.getProperty("items").get(0).phone.number, VALID_PHONE_NUMBER)
 
         factors = account.getFactors(Factors.GOOGLE_AUTHENTICATOR.criteria().limitTo(50).offsetBy(0).orderByCreatedAt());
-        assertEquals(factors.getProperty("items").size,1)
+        assertEquals(factors.getProperty("items").size, 1)
         assertNotNull(factors.getProperty("items").get(0).secret)
     }
 
     @Test
     void testCreateAndGetFactorWithNulIssuerAndNullAccountName() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -96,7 +99,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     @Test
     void testCreateAndGetFactorWithNullIssuerAndNoAccountName() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -113,7 +116,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     @Test
     void testCreateAndGetFactorWithIssuerAndNullAccountName() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -134,7 +137,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     @Test
     void testCreateAndGetFactorWithIssuerAndNoAccountName() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -152,7 +155,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     @Test
     void testCreateAndGetFactorWithInvalidIssuer() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -174,7 +177,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     @Test
     void testCreateAndGetFactorWithDifficultIssuer() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -191,7 +194,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     @Test
     void testCreateAndGetFactorWithInvalidAccountName() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -212,7 +215,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     @Test
     void testCreateAndGetFactorWithDifficultAccountName() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -228,7 +231,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     @Test
     void testCreateAndGetFactorWithAccountNameAndNullIssuer() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -244,7 +247,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     @Test
     void testCreateAndGetFactorWithBothIssuerAndAccountName() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -259,9 +262,26 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     }
 
     @Test
+    void testChallengeOnFactorCreation() {
+        Directory dir = client.instantiate(Directory)
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
+        dir = client.currentTenant.createDirectory(dir);
+        deleteOnTeardown(dir)
+        Account account = createTempAccountInDir(dir)
+
+        def randomAccountName = uniquify("Random AccountName")
+        def randomIssuer = uniquify("Random Issuer")
+        def factor = createGoogleAuthenticatorFactor(account, randomIssuer, randomAccountName, true, true)
+        assertGoogleAuthenticatorFactorFields(factor, randomIssuer, randomAccountName, true, true)
+
+        factor = client.getResource(factor.getHref(), GoogleAuthenticatorFactor.class)
+        assertGoogleAuthenticatorFactorFields(factor, randomIssuer, randomAccountName, true, true)
+    }
+
+    @Test
     void testSearchForFactor() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -270,22 +290,22 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
         FactorList factors = account.getFactors()
         assertEquals(factors.size, 2)
 
-        factors = account.getFactors(["type":"google-authenticator"])
+        factors = account.getFactors(["type": "google-authenticator"])
         assertEquals(factors.size, 1)
 
-        factors = account.getFactors(["verificationStatus":"UNVERIFIED"])
+        factors = account.getFactors(["verificationStatus": "UNVERIFIED"])
         assertEquals(factors.size, 2)
 
-        factors = account.getFactors(["issuer":"issuer"])
+        factors = account.getFactors(["issuer": "issuer"])
         assertEquals(factors.size, 1)
 
-        factors = account.getFactors(["issuer":"iss*"])
+        factors = account.getFactors(["issuer": "iss*"])
         assertEquals(factors.size, 1)
 
-        factors = account.getFactors(["accountName":"accountName*"])
+        factors = account.getFactors(["accountName": "accountName*"])
         assertEquals(factors.size, 1)
 
-        factors = account.getFactors(["accountName":"account*"])
+        factors = account.getFactors(["accountName": "account*"])
         assertEquals(factors.size, 1)
     }
 
@@ -295,7 +315,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     // todo: Enable this test once the issue is fixed
     void testDeleteFactorDeletesChallenges() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -313,7 +333,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
 
         factor.delete()
 
-        for(def currentChallenge : challenges) {
+        for (def currentChallenge : challenges) {
             Throwable e = null
             try {
                 client.getResource(currentChallenge.href, GoogleAuthenticatorChallenge.class)
@@ -335,7 +355,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
     // todo: Enable this test once the issue is fixed
     void testDeleteAccountDeletesFactorsAndChallenges() {
         Directory dir = client.instantiate(Directory)
-        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object(){}.getClass().getEnclosingMethod().getName()}")
+        dir.name = uniquify("Java SDK: ${this.getClass().getSimpleName()}.${new Object() {}.getClass().getEnclosingMethod().getName()}")
         dir = client.currentTenant.createDirectory(dir);
         deleteOnTeardown(dir)
         Account account = createTempAccountInDir(dir)
@@ -365,7 +385,7 @@ class GoogleAuthenticatorFactorIT extends AbstractMultiFactorIT{
         }
         assertTrue(e instanceof ResourceException)
 
-        for(def currentChallenge : challenges) {
+        for (def currentChallenge : challenges) {
             e = null
             try {
                 client.getResource(currentChallenge.href, GoogleAuthenticatorChallenge.class)

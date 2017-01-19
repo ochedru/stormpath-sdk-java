@@ -55,7 +55,7 @@ public abstract class AbstractSocialCallbackController extends AbstractControlle
         return true;
     }
 
-    protected abstract ProviderAccountRequest getAccountProviderRequest(HttpServletRequest request);
+    public abstract ProviderAccountRequest getAccountProviderRequest(HttpServletRequest request);
 
     @Override
     protected ViewModel doGet(HttpServletRequest request, HttpServletResponse response) throws Exception {
@@ -74,7 +74,22 @@ public abstract class AbstractSocialCallbackController extends AbstractControlle
         authenticationResultSaver.set(request, response, authcResult);
 
         eventPublisher.publish(new DefaultSuccessfulAuthenticationRequestEvent(request, response, null, authcResult));
+        String redirectUri = getRedirectUri(request);
 
-        return new DefaultViewModel(nextUri).setRedirect(true);
+        return new DefaultViewModel(redirectUri).setRedirect(true);
+    }
+
+    private String getRedirectUri(HttpServletRequest request) {
+        //Fixes #849 we send in the state the original path the user requested based on the next query param, so we can redirect back
+        String redirectUri = nextUri;
+        String next = ServletUtils.getCleanParam(request, "state");
+        if (shouldGetRedirectUriFromState(next)) {
+            redirectUri = next;
+        }
+        return redirectUri;
+    }
+
+    protected boolean shouldGetRedirectUriFromState(String state) {
+        return Strings.hasText(state);
     }
 }

@@ -1,18 +1,18 @@
 /*
- * Copyright 2014 Stormpath, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Copyright 2014 Stormpath, Inc.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 package com.stormpath.sdk.impl.account;
 
 import com.stormpath.sdk.account.*;
@@ -51,6 +51,7 @@ import com.stormpath.sdk.query.Criteria;
 import com.stormpath.sdk.resource.ResourceException;
 import com.stormpath.sdk.tenant.Tenant;
 
+import java.util.Date;
 import java.util.Map;
 
 /**
@@ -67,6 +68,10 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     static final StringProperty SURNAME = new StringProperty("surname");
     static final EnumProperty<AccountStatus> STATUS = new EnumProperty<>(AccountStatus.class);
     static final StringProperty FULL_NAME = new StringProperty("fullName"); //computed property, can't set it or query based on it
+    // @since 1.2.0
+    static final EnumProperty<EmailVerificationStatus> EMAIL_VERIFICATION_STATUS = new EnumProperty<>("emailVerificationStatus", EmailVerificationStatus.class);
+    // @since 1.2.0
+    public static final DateProperty PASSWORD_MODIFIED_AT = new DateProperty("passwordModifiedAt");
 
     // INSTANCE RESOURCE REFERENCES:
     static final ResourceReference<EmailVerificationToken> EMAIL_VERIFICATION_TOKEN =
@@ -110,8 +115,8 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
 
     static final Map<String, Property> PROPERTY_DESCRIPTORS = createPropertyDescriptorMap(
             USERNAME, EMAIL, PASSWORD, GIVEN_NAME, MIDDLE_NAME, SURNAME, STATUS, FULL_NAME,
-            EMAIL_VERIFICATION_TOKEN, CUSTOM_DATA, DIRECTORY, TENANT, GROUPS, GROUP_MEMBERSHIPS, 
-            PROVIDER_DATA,API_KEYS, APPLICATIONS, ACCESS_TOKENS, REFRESH_TOKENS, LINKED_ACCOUNTS, ACCOUNT_LINKS,PHONES, FACTORS);
+            EMAIL_VERIFICATION_TOKEN, EMAIL_VERIFICATION_STATUS, CUSTOM_DATA, DIRECTORY, TENANT, GROUPS, GROUP_MEMBERSHIPS,
+            PROVIDER_DATA, API_KEYS, APPLICATIONS, ACCESS_TOKENS, REFRESH_TOKENS, LINKED_ACCOUNTS, ACCOUNT_LINKS, PHONES, FACTORS, PASSWORD_MODIFIED_AT);
 
     public DefaultAccount(InternalDataStore dataStore) {
         super(dataStore);
@@ -213,6 +218,21 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     }
 
     @Override
+    public EmailVerificationStatus getEmailVerificationStatus() {
+        String value = getStringProperty(EMAIL_VERIFICATION_STATUS.getName());
+        if (value == null) {
+            return null;
+        }
+        return EmailVerificationStatus.valueOf(value.toUpperCase());
+    }
+
+    @Override
+    public Account setEmailVerificationStatus(EmailVerificationStatus emailVerificationStatus) {
+        setProperty(EMAIL_VERIFICATION_STATUS, emailVerificationStatus.name());
+        return this;
+    }
+
+    @Override
     public GroupList getGroups() {
         return getResourceProperty(GROUPS);
     }
@@ -242,7 +262,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
 
 
     @Override
-    public FactorList getFactors(){
+    public FactorList getFactors() {
         return getResourceProperty(FACTORS);
     }
 
@@ -259,7 +279,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     }
 
     @Override
-    public PhoneList getPhones(PhoneCriteria criteria){
+    public PhoneList getPhones(PhoneCriteria criteria) {
         PhoneList list = getPhones(); //safe to get the href: does not execute a query until iteration occurs
         return getDataStore().getResource(list.getHref(), PhoneList.class, (Criteria<PhoneCriteria>) criteria);
     }
@@ -293,8 +313,8 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     @Override
     public GroupMembership addGroup(String hrefOrName) {
         Assert.hasText(hrefOrName, "hrefOrName cannot be null or empty");
-        Group group =  findGroupInDirectory(hrefOrName, this.getDirectory());
-        if (group != null){
+        Group group = findGroupInDirectory(hrefOrName, this.getDirectory());
+        if (group != null) {
             return DefaultGroupMembership.create(this, group, getDataStore());
         } else {
             throw new IllegalStateException("The specified group was not found in this Account's directory.");
@@ -314,7 +334,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
                 break;
             }
         }
-        if (groupMembership != null){
+        if (groupMembership != null) {
             groupMembership.delete();
         } else {
             throw new IllegalStateException("This account does not belong to the specified group.");
@@ -334,7 +354,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
                 break;
             }
         }
-        if (groupMembership != null){
+        if (groupMembership != null) {
             groupMembership.delete();
         } else {
             throw new IllegalStateException("This account does not belong to the specified group.");
@@ -368,7 +388,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
      */
     @Override
     public boolean isMemberOfGroup(String hrefOrName) {
-        if(!Strings.hasText(hrefOrName)) {
+        if (!Strings.hasText(hrefOrName)) {
             return false;
         }
         for (Group aGroup : getGroups()) {
@@ -384,7 +404,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
      */
     @Override
     public boolean isMemberOfGroup(Group group) {
-        if(group == null) {
+        if (group == null) {
             return false;
         }
         return isMemberOfGroup(group.getHref());
@@ -395,7 +415,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
      */
     @Override
     public boolean isLinkedToAccount(String href) {
-        if(!Strings.hasText(href)) {
+        if (!Strings.hasText(href)) {
             return false;
         }
         for (Account anAccount : getLinkedAccounts()) {
@@ -411,7 +431,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
      */
     @Override
     public boolean isLinkedToAccount(Account otherAccount) {
-        if(otherAccount == null){
+        if (otherAccount == null) {
             return false;
         }
         return isLinkedToAccount(otherAccount.getHref());
@@ -421,6 +441,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     public ApiKeyList getApiKeys() {
         return getResourceProperty(API_KEYS);
     }
+
     /**
      * Returns the {@link ProviderData} instance associated with this Account.
      *
@@ -483,20 +504,26 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
         return getDataStore().create(href, new DefaultApiKey(getDataStore()), options);
     }
 
-    /** @since 1.0.RC4 */
+    /**
+     * @since 1.0.RC4
+     */
     @Override
     public ApplicationList getApplications() {
         return getResourceProperty(APPLICATIONS);
     }
 
-    /** @since 1.0.RC4 */
+    /**
+     * @since 1.0.RC4
+     */
     @Override
     public ApplicationList getApplications(Map<String, Object> queryParams) {
         ApplicationList proxy = getApplications(); //just a proxy - does not execute a query until iteration occurs
         return getDataStore().getResource(proxy.getHref(), ApplicationList.class, queryParams);
     }
 
-    /** @since 1.0.RC4 */
+    /**
+     * @since 1.0.RC4
+     */
     @Override
     public ApplicationList getApplications(ApplicationCriteria criteria) {
         ApplicationList proxy = getApplications(); //just a proxy - does not execute a query until iteration occurs
@@ -536,7 +563,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
                 group = getDataStore().getResource(hrefOrName, Group.class);
 
                 // Notice that accounts can only be added to Groups in the same directory
-                if (group != null && group.getDirectory().getHref().equals(directory.getHref())){
+                if (group != null && group.getDirectory().getHref().equals(directory.getHref())) {
                     return group;
                 }
             } catch (ResourceException e) {
@@ -545,7 +572,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
             }
         }
         GroupList groups = directory.getGroups(Groups.where(Groups.name().eqIgnoreCase(hrefOrName)));
-        if (groups.iterator().hasNext()){
+        if (groups.iterator().hasNext()) {
             group = groups.iterator().next();
         }
 
@@ -599,7 +626,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     @Override
     public AccountLink unlink(Account otherAccount) {
         Assert.notNull(otherAccount, "otherAccount cannot be null");
-        return  unlink(otherAccount.getHref());
+        return unlink(otherAccount.getHref());
     }
 
     @Override
@@ -613,7 +640,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
                 break;
             }
         }
-        if (accountLink != null){
+        if (accountLink != null) {
             accountLink.delete();
         }
 
@@ -646,7 +673,7 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
         String href = getPhones().getHref();
 
         if (request.hasPhoneOptions()) {
-            return  getDataStore().create(href, phone, request.getPhoneOptions());
+            return getDataStore().create(href, phone, request.getPhoneOptions());
         }
         return getDataStore().create(href, phone);
     }
@@ -658,30 +685,31 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     }
 
     @Override
-    public <T extends Factor> T createFactor(T factor) throws ResourceException{
+    public <T extends Factor> T createFactor(T factor) throws ResourceException {
         Assert.notNull(factor, "Factor instance cannot be null.");
         return getDataStore().create(getFactors().getHref(), factor);
     }
 
     @Override
-    public <T extends Factor, R extends FactorOptions> T createFactor(CreateFactorRequest<T,R> request) throws ResourceException {
+    public <T extends Factor, R extends FactorOptions> T createFactor(CreateFactorRequest<T, R> request) throws ResourceException {
         Assert.notNull(request, "Request cannot be null.");
 
         final Factor factor = request.getFactor();
         String href = getFactors().getHref();
 
-        if(request instanceof CreateSmsFactorRequest) {
-            CreateSmsFactorRequest smsRequest = (CreateSmsFactorRequest) request;
-            if (smsRequest.isCreateChallenge()) {
-                href += "?challenge=" + smsRequest.isCreateChallenge();
-            }
+        if (request.isCreateChallenge()) {
+            href += "?challenge=true";
         }
 
         if (request.hasFactorOptions()) {
             return (T) getDataStore().create(href, factor, request.getFactorOptions());
         }
         return (T) getDataStore().create(href, factor);
+    }
 
+    @Override
+    public Date getPasswordModifiedAt() {
+        return getDateProperty(PASSWORD_MODIFIED_AT);
     }
 }
 

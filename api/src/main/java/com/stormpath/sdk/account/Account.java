@@ -41,6 +41,7 @@ import com.stormpath.sdk.provider.ProviderData;
 import com.stormpath.sdk.resource.*;
 import com.stormpath.sdk.tenant.Tenant;
 
+import java.util.Date;
 import java.util.Map;
 
 /**
@@ -176,6 +177,23 @@ public interface Account extends Resource, Saveable, Deletable, Extendable, Audi
      * @return this instance for method chaining.
      */
     Account setStatus(AccountStatus status);
+
+    /**
+     * Returns the account's emailVerificationStatus.
+     *
+     * @return the account's emailVerificationStatus.
+     * @since 1.2.0
+     */
+    EmailVerificationStatus getEmailVerificationStatus();
+
+    /**
+     * Sets the account's emailVerificationStatus.
+     *
+     * @param emailVerificationStatus the account's emailVerificationStatus.
+     * @return this instance for method chaining.
+     * @since 1.2.0
+     */
+    Account setEmailVerificationStatus(EmailVerificationStatus emailVerificationStatus);
 
     /**
      * Returns a paginated list of the account's assigned groups.
@@ -947,6 +965,13 @@ public interface Account extends Resource, Saveable, Deletable, Extendable, Audi
      * @since 1.1.0
      */
     AccountLinkList getAccountLinks(AccountLinkCriteria criteria);
+
+    /**
+     * Returns the date the last time this Account's password has been modified.
+     * @return the date the last time this Account's password has been modified.
+     * @since 1.2.0
+     */
+    Date getPasswordModifiedAt();
     
     OrganizationList getOrganizations();
     OrganizationList getOrganizations(Map<String, Object> queryParams);

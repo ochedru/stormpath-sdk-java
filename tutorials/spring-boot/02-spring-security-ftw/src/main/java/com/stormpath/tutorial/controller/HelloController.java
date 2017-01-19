@@ -20,6 +20,7 @@ import com.stormpath.tutorial.service.HelloService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import javax.servlet.http.HttpServletRequest;
@@ -30,8 +31,16 @@ import javax.servlet.http.HttpServletRequest;
 @Controller
 public class HelloController {
 
-    @Autowired
+    private AccountResolver accountResolver;
     private HelloService helloService;
+
+    @Autowired
+    public HelloController(AccountResolver accountResolver, HelloService helloService) {
+        Assert.notNull(accountResolver);
+        Assert.notNull(helloService);
+        this.accountResolver = accountResolver;
+        this.helloService = helloService;
+    }
 
     @RequestMapping("/")
     String home(HttpServletRequest req, Model model) {
@@ -42,7 +51,7 @@ public class HelloController {
     @RequestMapping("/restricted")
     String restricted(HttpServletRequest req, Model model) {
         String msg = helloService.sayHello(
-            AccountResolver.INSTANCE.getAccount(req)
+            accountResolver.getAccount(req)
         );
         model.addAttribute("msg", msg);
         return "restricted";

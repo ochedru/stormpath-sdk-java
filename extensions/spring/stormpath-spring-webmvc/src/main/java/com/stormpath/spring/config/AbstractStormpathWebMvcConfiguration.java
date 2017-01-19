@@ -72,8 +72,6 @@ import com.stormpath.sdk.servlet.filter.account.CookieAuthenticationResultSaver;
 import com.stormpath.sdk.servlet.filter.account.DefaultJwtAccountResolver;
 import com.stormpath.sdk.servlet.filter.account.JwtAccountResolver;
 import com.stormpath.sdk.servlet.filter.account.JwtSigningKeyResolver;
-import com.stormpath.sdk.servlet.filter.account.SessionAccountResolver;
-import com.stormpath.sdk.servlet.filter.account.SessionAuthenticationResultSaver;
 import com.stormpath.sdk.servlet.filter.mvc.ControllerFilter;
 import com.stormpath.sdk.servlet.filter.oauth.AccessTokenAuthenticationRequestFactory;
 import com.stormpath.sdk.servlet.filter.oauth.AccessTokenResultFactory;
@@ -107,9 +105,12 @@ import com.stormpath.sdk.servlet.mvc.AccessTokenController;
 import com.stormpath.sdk.servlet.mvc.ChangePasswordController;
 import com.stormpath.sdk.servlet.mvc.ContentNegotiatingFieldValueResolver;
 import com.stormpath.sdk.servlet.mvc.Controller;
+import com.stormpath.sdk.servlet.mvc.DefaultExpandsResolver;
+import com.stormpath.sdk.servlet.mvc.DefaultProviderAccountRequestFactory;
 import com.stormpath.sdk.servlet.mvc.DefaultViewResolver;
 import com.stormpath.sdk.servlet.mvc.DisabledWebHandler;
 import com.stormpath.sdk.servlet.mvc.ErrorModelFactory;
+import com.stormpath.sdk.servlet.mvc.ExpandsResolver;
 import com.stormpath.sdk.servlet.mvc.ForgotPasswordController;
 import com.stormpath.sdk.servlet.mvc.FormController;
 import com.stormpath.sdk.servlet.mvc.IdSiteController;
@@ -120,6 +121,7 @@ import com.stormpath.sdk.servlet.mvc.LoginController;
 import com.stormpath.sdk.servlet.mvc.LoginErrorModelFactory;
 import com.stormpath.sdk.servlet.mvc.LogoutController;
 import com.stormpath.sdk.servlet.mvc.MeController;
+import com.stormpath.sdk.servlet.mvc.ProviderAccountRequestFactory;
 import com.stormpath.sdk.servlet.mvc.RegisterController;
 import com.stormpath.sdk.servlet.mvc.RequestFieldValueResolver;
 import com.stormpath.sdk.servlet.mvc.SamlController;
@@ -140,10 +142,13 @@ import com.stormpath.sdk.servlet.oauth.impl.JwtTokenSigningKeyResolver;
 import com.stormpath.sdk.servlet.organization.DefaultOrganizationNameKeyResolver;
 import com.stormpath.sdk.servlet.saml.DefaultSamlOrganizationResolver;
 import com.stormpath.sdk.servlet.saml.SamlOrganizationContext;
+import com.stormpath.sdk.servlet.util.DefaultGrantTypeValidator;
+import com.stormpath.sdk.servlet.util.GrantTypeValidator;
 import com.stormpath.sdk.servlet.util.IsLocalhostResolver;
 import com.stormpath.sdk.servlet.util.RemoteAddrResolver;
 import com.stormpath.sdk.servlet.util.SecureRequiredExceptForLocalhostResolver;
 import com.stormpath.sdk.servlet.util.SubdomainResolver;
+import com.stormpath.spring.mvc.AccessTokenControllerConfig;
 import com.stormpath.spring.mvc.ChangePasswordControllerConfig;
 import com.stormpath.spring.mvc.DisabledHandlerMapping;
 import com.stormpath.spring.mvc.ForgotPasswordControllerConfig;
@@ -176,6 +181,9 @@ import org.springframework.util.PathMatcher;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.LocaleResolver;
@@ -200,7 +208,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -273,7 +280,7 @@ public abstract class AbstractStormpathWebMvcConfiguration {
     @Value("#{ @environment['stormpath.web.stormpathFilter.enabled'] ?: true }")
     protected boolean stormpathFilterEnabled;
 
-    @Value("#{ @environment['stormpath.web.stormpathFilter.order'] ?: T(org.springframework.core.Ordered).HIGHEST_PRECEDENCE }")
+    @Value("#{ @environment['stormpath.web.stormpathFilter.order'] ?: 10}") //Spring Security uses order 0, we want to be behind it, so we set it to 10 in case there is need for addional filters in-between
     protected int stormpathFilterOrder;
 
     @Value("#{ @environment['stormpath.web.stormpathFilter.urlPatterns'] ?: '/*' }")
@@ -328,20 +335,6 @@ public abstract class AbstractStormpathWebMvcConfiguration {
 
     @Value("#{ @environment['stormpath.web.logout.invalidateHttpSession'] ?: true }")
     protected boolean logoutInvalidateHttpSession;
-
-    // ================  Access Token Controller properties  ===================
-
-    @Value("#{ @environment['stormpath.web.oauth2.enabled'] ?: true }")
-    protected boolean accessTokenEnabled;
-
-    @Value("#{ @environment['stormpath.web.oauth2.uri'] ?: '/oauth/token' }")
-    protected String accessTokenUri;
-
-    @Value("#{ @environment['stormpath.web.oauth2.origin.authorizer.originUris'] }")
-    protected String accessTokenAuthorizedOriginUris;
-
-    @Value("#{ @environment['stormpath.web.oauth2.password.validationStrategy'] ?: 'local'}")
-    protected String accessTokenValidationStrategy;
 
     // ================  ID Site properties  ===================
 
@@ -404,6 +397,23 @@ public abstract class AbstractStormpathWebMvcConfiguration {
 
     @Value("#{ @environment['stormpath.web.jsp.view.resolver.order'] ?: T(org.springframework.core.Ordered).LOWEST_PRECEDENCE}")
     protected int jspViewResolverOrder;
+
+    // ================  CORS properties ==================
+
+    @Value("#{ @environment['stormpath.web.cors.enabled'] ?: true }")
+    protected boolean corsEnabled;
+
+    @Value("#{ @environment['stormpath.web.cors.allowed.originUris'] }")
+    protected String corsAllowedOrigins;
+
+    @Value("#{ @environment['stormpath.web.cors.allowed.headers'] ?: 'Content-Type,Accept,X-Requested-With,remember-me,authorization,x-stormpath-agent' }")
+    protected String corsAllowedHeaders;
+
+    @Value("#{ @environment['stormpath.web.cors.allowed.methods'] ?: 'POST,GET,OPTIONS,DELETE,PUT' }")
+    protected String corsAllowedMethods;
+
+    @Value("#{ @environment['stormpath.web.cors.allow.credentials'] ?: true }")
+    protected boolean corsAllowCredentials;
 
     @Autowired(required = false)
     protected PathMatcher pathMatcher;
@@ -530,9 +540,12 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         if (stormpathChangePasswordConfig().isEnabled()) {
             addFilter(mgr, stormpathChangePasswordController(), stormpathChangePasswordConfig());
         }
-        if (accessTokenEnabled) {
-            addFilter(mgr, stormpathAccessTokenController(), "accessToken", accessTokenUri);
+
+        AccessTokenControllerConfig accessTokenControllerConfig = stormpathAccessTokenConfig();
+        if (accessTokenControllerConfig.isEnabled()) {
+            addFilter(mgr, stormpathAccessTokenController(), accessTokenControllerConfig.getControllerKey(), accessTokenControllerConfig.getAccessTokenUri());
         }
+
         if (idSiteEnabled) {
             addFilter(mgr, stormpathIdSiteResultController(), "idSiteResult", callbackUri);
         }
@@ -580,6 +593,13 @@ public abstract class AbstractStormpathWebMvcConfiguration {
 
     public ApplicationResolver stormpathApplicationResolver() {
         return new DefaultApplicationResolver();
+    }
+
+    /**
+     * @since 1.3.0
+     */
+    public ProviderAccountRequestFactory stormpathAccountProviderRequestHandler() {
+        return new DefaultProviderAccountRequestFactory();
     }
 
     public Resolver<Boolean> stormpathRegisterEnabledResolver() {
@@ -731,27 +751,11 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         return DisabledAuthenticationResultSaver.INSTANCE;
     }
 
-    public Saver<AuthenticationResult> stormpathSessionAuthenticationResultSaver() {
-
-        if (sessionAuthenticationResultSaverEnabled) {
-            String[] attributeNames = {Account.class.getName(), "account"};
-            Set<String> set = new HashSet<String>(Arrays.asList(attributeNames));
-            return new SessionAuthenticationResultSaver(set);
-        }
-
-        return DisabledAuthenticationResultSaver.INSTANCE;
-    }
-
     public List<Saver<AuthenticationResult>> stormpathAuthenticationResultSavers() {
 
         List<Saver<AuthenticationResult>> savers = new ArrayList<Saver<AuthenticationResult>>();
 
         Saver<AuthenticationResult> saver = stormpathCookieAuthenticationResultSaver();
-        if (!(saver instanceof DisabledAuthenticationResultSaver)) {
-            savers.add(saver);
-        }
-
-        saver = stormpathSessionAuthenticationResultSaver();
         if (!(saver instanceof DisabledAuthenticationResultSaver)) {
             savers.add(saver);
         }
@@ -838,7 +842,7 @@ public abstract class AbstractStormpathWebMvcConfiguration {
     }
 
     public HttpAuthenticationScheme stormpathBearerAuthenticationScheme() {
-        return new BearerAuthenticationScheme(stormpathJwtSigningKeyResolver(), AccessTokenValidationStrategy.fromName(accessTokenValidationStrategy));
+        return new BearerAuthenticationScheme(stormpathJwtSigningKeyResolver(), AccessTokenValidationStrategy.fromName(stormpathAccessTokenConfig().getAccessTokenValidationStrategy()));
     }
 
     public List<HttpAuthenticationScheme> stormpathHttpAuthenticationSchemes() {
@@ -868,10 +872,6 @@ public abstract class AbstractStormpathWebMvcConfiguration {
             stormpathAccessTokenResultFactory());
     }
 
-    public Resolver<Account> stormpathSessionAccountResolver() {
-        return new SessionAccountResolver();
-    }
-
     public List<Resolver<Account>> stormpathAccountResolvers() {
 
         //the order determines which locations are checked.  One an account is found, the remaining locations are
@@ -879,7 +879,6 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         List<Resolver<Account>> resolvers = new ArrayList<Resolver<Account>>(3);
         resolvers.add(stormpathAuthorizationHeaderAccountResolver());
         resolvers.add(stormpathCookieAccountResolver());
-        resolvers.add(stormpathSessionAccountResolver());
 
         return resolvers;
     }
@@ -980,6 +979,7 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         c.setLogoutUri(stormpathLogoutConfig().getUri());
         c.setApplicationResolver(stormpathApplicationResolver());
         c.setAuthenticationResultSaver(stormpathAuthenticationResultSaver());
+        c.setAccountStoreModelFactory(stormpathAccountStoreModelFactory());
         c.setPreLoginHandler(loginPreHandler);
         c.setPostLoginHandler(loginPostHandler);
         c.setIdSiteEnabled(idSiteEnabled);
@@ -1156,6 +1156,16 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         return init(c);
     }
 
+    // ========================== Access Token =======================================
+
+
+    /**
+     * @since 1.2.0
+     */
+    public AccessTokenControllerConfig stormpathAccessTokenConfig() {
+        return new AccessTokenControllerConfig();
+    }
+
     public Controller stormpathAccessTokenController() {
 
         AccessTokenController c = new AccessTokenController();
@@ -1167,8 +1177,22 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         c.setAccountSaver(stormpathAuthenticationResultSaver());
         c.setRequestAuthorizer(stormpathAccessTokenRequestAuthorizer());
         c.setBasicAuthenticationScheme(stormpathBasicAuthenticationScheme());
+        c.setGrantTypeValidator(stormpathGrantTypeStatusValidator());
 
         return init(c);
+    }
+
+    /**
+     * @since 1.2.0
+     */
+    public GrantTypeValidator stormpathGrantTypeStatusValidator() {
+        AccessTokenControllerConfig config = stormpathAccessTokenConfig();
+
+        DefaultGrantTypeValidator grantTypeStatusValidator = new DefaultGrantTypeValidator();
+        grantTypeStatusValidator.setClientCredentialsGrantTypeEnabled(config.isClientCredentialsGrantTypeEnabled());
+        grantTypeStatusValidator.setPasswordGrantTypeEnabled(config.isPasswordGrantTypeEnabled());
+
+        return grantTypeStatusValidator;
     }
 
     public Controller stormpathIdSiteResultController() {
@@ -1186,6 +1210,24 @@ public abstract class AbstractStormpathWebMvcConfiguration {
     }
 
     public Controller stormpathMeController() {
+        MeController controller = new MeController();
+
+        controller.setExpandsResolver(stormpathMeExpandsResolver());
+        controller.setObjectMapper(objectMapper);
+        controller.setProduces(stormpathProducedMediaTypes());
+        controller.setUri(meUri);
+        controller.setLoginPageRedirector(new DefaultLoginPageRedirector(stormpathLoginConfig().getUri()));
+        controller.setApplicationResolver(stormpathApplicationResolver());
+
+        init(controller);
+
+        return controller;
+    }
+
+    /**
+     * @since 1.2.0
+     */
+    public ExpandsResolver stormpathMeExpandsResolver(){
         List<String> expandedAccountAttributes = new ArrayList<>();
 
         getPropertiesStartingWith((ConfigurableEnvironment) environment, "stormpath.web.me.expand");
@@ -1201,18 +1243,7 @@ public abstract class AbstractStormpathWebMvcConfiguration {
             }
         }
 
-        MeController controller = new MeController();
-
-        controller.setExpands(expandedAccountAttributes);
-        controller.setObjectMapper(objectMapper);
-        controller.setProduces(stormpathProducedMediaTypes());
-        controller.setUri(meUri);
-        controller.setLoginPageRedirector(new DefaultLoginPageRedirector(stormpathLoginConfig().getUri()));
-        controller.setApplicationResolver(stormpathApplicationResolver());
-
-        init(controller);
-
-        return controller;
+        return new DefaultExpandsResolver(expandedAccountAttributes);
     }
 
     public Controller stormpathSamlResultController() {
@@ -1246,7 +1277,7 @@ public abstract class AbstractStormpathWebMvcConfiguration {
     }
 
     public Set<String> stormpathAccessTokenAuthorizedOriginUris() {
-        return Strings.delimitedListToSet(accessTokenAuthorizedOriginUris, " \t");
+        return Strings.delimitedListToSet(stormpathAccessTokenConfig().getAccessTokenAuthorizedOriginUris(), " \t");
     }
 
     public RequestAuthorizer stormpathOriginAccessTokenRequestAuthorizer() {
@@ -1277,19 +1308,19 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         c.setProduces(stormpathProducedMediaTypes());
     }
 
-    private <T extends FormController> T configure(T c, ControllerConfig cr) {
-        configure(c);
-        c.setUri(cr.getUri());
-        c.setNextUri(cr.getNextUri());
-        c.setView(cr.getView());
-        c.setControllerKey(cr.getControllerKey());
-        c.setCsrfTokenManager(stormpathCsrfTokenManager());
-        c.setFieldValueResolver(stormpathFieldValueResolver());
+    private <T extends FormController> T configure(T controller, ControllerConfig cr) {
+        configure(controller);
+        controller.setUri(cr.getUri());
+        controller.setNextUri(cr.getNextUri());
+        controller.setView(cr.getView());
+        controller.setControllerKey(cr.getControllerKey());
+        controller.setCsrfTokenManager(stormpathCsrfTokenManager());
+        controller.setFieldValueResolver(stormpathFieldValueResolver());
         List<Field> fields = cr.getFormFields();
         if (!Collections.isEmpty(fields)) { //might be empty if the fields are static / configured within the controller
-            c.setFormFields(fields);
+            controller.setFormFields(fields);
         }
-        return c;
+        return controller;
     }
 
     private <T extends AbstractSocialCallbackController> T configure(T c) {
@@ -1389,8 +1420,12 @@ public abstract class AbstractStormpathWebMvcConfiguration {
         AccountResolverFilter accountResolverFilter = new AccountResolverFilter();
         accountResolverFilter.setEnabled(stormpathFilterEnabled);
         accountResolverFilter.setResolvers(stormpathAccountResolvers());
-        accountResolverFilter.setOauthEndpointUri(accessTokenUri);
+        accountResolverFilter.setOauthEndpointUri(stormpathAccessTokenConfig().getAccessTokenUri());
         List<Filter> priorityFilters = Collections.<Filter>toList(accountResolverFilter);
+
+        if (corsEnabled) {
+            priorityFilters.add(newCorsFilter());
+        }
 
         return new PrioritizedFilterChainResolver(resolver, priorityFilters);
     }
@@ -1484,6 +1519,62 @@ public abstract class AbstractStormpathWebMvcConfiguration {
 
             aBase.put(entry.getKey(), entry.getValue());
         }
+    }
+
+    /**
+     * Fix for https://github.com/stormpath/stormpath-sdk-java/issues/699
+     *
+     * @since 1.2.0
+     */
+    public Filter newCorsFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(true);
+        config.setAllowedOrigins(stormpathCorsAllowedOrigins());
+        config.setAllowedHeaders(stormpathCorsAllowedHeaders());
+        config.setAllowedMethods(stormpathCorsAllowedMethods());
+        config.setAllowCredentials(corsAllowCredentials);
+        source.registerCorsConfiguration("/**", config);
+        return new CorsFilter(source);
+    }
+
+    /**
+     * Fix for https://github.com/stormpath/stormpath-sdk-java/issues/699
+     *
+     * @since 1.2.0
+     */
+    public List<String> stormpathCorsAllowedOrigins() {
+        if (Strings.hasText(corsAllowedOrigins)) {
+            return Arrays.asList(Strings.split(corsAllowedOrigins));
+        }
+
+        return java.util.Collections.emptyList();
+    }
+
+    /**
+     * Fix for https://github.com/stormpath/stormpath-sdk-java/issues/699
+     *
+     * @since 1.2.0
+     */
+    public List<String> stormpathCorsAllowedMethods() {
+        if (Strings.hasText(corsAllowedOrigins)) {
+            return Arrays.asList(Strings.split(corsAllowedMethods));
+        }
+
+        return java.util.Collections.emptyList();
+    }
+
+    /**
+     * Fix for https://github.com/stormpath/stormpath-sdk-java/issues/699
+     *
+     * @since 1.2.0
+     */
+    public List<String> stormpathCorsAllowedHeaders() {
+        if (Strings.hasText(corsAllowedOrigins)) {
+            return Arrays.asList(Strings.split(corsAllowedHeaders));
+        }
+
+        return java.util.Collections.emptyList();
     }
 }
 

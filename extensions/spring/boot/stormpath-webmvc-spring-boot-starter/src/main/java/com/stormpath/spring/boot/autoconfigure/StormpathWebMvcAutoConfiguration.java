@@ -15,7 +15,6 @@
  */
 package com.stormpath.spring.boot.autoconfigure;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stormpath.sdk.account.Account;
 import com.stormpath.sdk.application.Application;
 import com.stormpath.sdk.authc.AuthenticationResult;
@@ -45,6 +44,8 @@ import com.stormpath.sdk.servlet.filter.account.JwtAccountResolver;
 import com.stormpath.sdk.servlet.filter.account.JwtSigningKeyResolver;
 import com.stormpath.sdk.servlet.filter.oauth.AccessTokenAuthenticationRequestFactory;
 import com.stormpath.sdk.servlet.filter.oauth.AccessTokenResultFactory;
+import com.stormpath.sdk.servlet.filter.oauth.RefreshTokenAuthenticationRequestFactory;
+import com.stormpath.sdk.servlet.filter.oauth.RefreshTokenResultFactory;
 import com.stormpath.sdk.servlet.http.MediaType;
 import com.stormpath.sdk.servlet.http.Resolver;
 import com.stormpath.sdk.servlet.http.Saver;
@@ -52,14 +53,18 @@ import com.stormpath.sdk.servlet.http.authc.AccountStoreResolver;
 import com.stormpath.sdk.servlet.http.authc.HeaderAuthenticator;
 import com.stormpath.sdk.servlet.http.authc.HttpAuthenticationScheme;
 import com.stormpath.sdk.servlet.idsite.IdSiteOrganizationContext;
+import com.stormpath.sdk.servlet.mvc.ProviderAccountRequestFactory;
 import com.stormpath.sdk.servlet.mvc.Controller;
+import com.stormpath.sdk.servlet.mvc.ExpandsResolver;
 import com.stormpath.sdk.servlet.mvc.RequestFieldValueResolver;
 import com.stormpath.sdk.servlet.mvc.View;
 import com.stormpath.sdk.servlet.mvc.provider.AccountStoreModelFactory;
+import com.stormpath.sdk.servlet.util.GrantTypeValidator;
 import com.stormpath.spring.config.AbstractStormpathWebMvcConfiguration;
 import com.stormpath.spring.config.AccessTokenCookieProperties;
 import com.stormpath.spring.config.RefreshTokenCookieProperties;
 import com.stormpath.spring.config.StormpathMessageSourceConfiguration;
+import com.stormpath.spring.mvc.AccessTokenControllerConfig;
 import com.stormpath.spring.mvc.ChangePasswordControllerConfig;
 import com.stormpath.spring.mvc.MessageContextRegistrar;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -109,6 +114,16 @@ public class StormpathWebMvcAutoConfiguration extends AbstractStormpathWebMvcCon
     @Override
     public ApplicationResolver stormpathApplicationResolver() {
         return super.stormpathApplicationResolver();
+    }
+
+    /**
+     * @since 1.3.0
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @Override
+    public ProviderAccountRequestFactory stormpathAccountProviderRequestHandler() {
+        return super.stormpathAccountProviderRequestHandler();
     }
 
     @Override
@@ -223,12 +238,6 @@ public class StormpathWebMvcAutoConfiguration extends AbstractStormpathWebMvcCon
     }
 
     @Bean
-    @ConditionalOnMissingBean(name = "stormpathSessionAuthenticationResultSaver")
-    public Saver<AuthenticationResult> stormpathSessionAuthenticationResultSaver() {
-        return super.stormpathSessionAuthenticationResultSaver();
-    }
-
-    @Bean
     @ConditionalOnMissingBean(name = "stormpathAuthenticationResultSavers")
     public List<Saver<AuthenticationResult>> stormpathAuthenticationResultSavers() {
         return super.stormpathAuthenticationResultSavers();
@@ -297,6 +306,12 @@ public class StormpathWebMvcAutoConfiguration extends AbstractStormpathWebMvcCon
 
     @Bean
     @ConditionalOnMissingBean
+    public RefreshTokenResultFactory stormpathRefreshTokenResultFactory() {
+        return super.stormpathRefreshTokenResultFactory();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     public WrappedServletRequestFactory stormpathWrappedServletRequestFactory() {
         return super.stormpathWrappedServletRequestFactory();
     }
@@ -335,12 +350,6 @@ public class StormpathWebMvcAutoConfiguration extends AbstractStormpathWebMvcCon
     @ConditionalOnMissingBean(name = "stormpathCookieAccountResolver")
     public Resolver<Account> stormpathCookieAccountResolver() {
         return super.stormpathCookieAccountResolver();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(name = "stormpathSessionAccountResolver")
-    public Resolver<Account> stormpathSessionAccountResolver() {
-        return super.stormpathSessionAccountResolver();
     }
 
     @Bean
@@ -498,6 +507,12 @@ public class StormpathWebMvcAutoConfiguration extends AbstractStormpathWebMvcCon
     }
 
     @Bean
+    @ConditionalOnMissingBean
+    public RefreshTokenAuthenticationRequestFactory stormpathRefreshTokenAuthenticationRequestFactory() {
+        return super.stormpathRefreshTokenAuthenticationRequestFactory();
+    }
+
+    @Bean
     @ConditionalOnMissingBean(name = "stormpathAccessTokenRequestAuthorizer")
     public RequestAuthorizer stormpathAccessTokenRequestAuthorizer() {
         return super.stormpathAccessTokenRequestAuthorizer();
@@ -532,6 +547,12 @@ public class StormpathWebMvcAutoConfiguration extends AbstractStormpathWebMvcCon
     @ConditionalOnMissingBean(name = "stormpathMeController")
     public Controller stormpathMeController() {
         return super.stormpathMeController();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ExpandsResolver stormpathMeExpandsResolver() {
+        return super.stormpathMeExpandsResolver();
     }
 
     @Bean
@@ -580,7 +601,7 @@ public class StormpathWebMvcAutoConfiguration extends AbstractStormpathWebMvcCon
         if (Collections.isEmpty(names)) {
             return java.util.Collections.emptySet();
         }
-        Set<DispatcherType> types = new LinkedHashSet<DispatcherType>(names.size());
+        Set<DispatcherType> types = new LinkedHashSet<>(names.size());
         for (String name : names) {
             types.add(DispatcherType.valueOf(name));
         }
@@ -651,5 +672,23 @@ public class StormpathWebMvcAutoConfiguration extends AbstractStormpathWebMvcCon
     @ConditionalOnMissingBean(name = "stormpathVerifyConfig")
     public ControllerConfig stormpathVerifyConfig() {
         return super.stormpathVerifyConfig();
+    }
+
+    /**
+     * @since 1.2.0
+     */
+    @Bean
+    @ConditionalOnMissingBean(name = "stormpathAccessTokenConfig")
+    public AccessTokenControllerConfig stormpathAccessTokenConfig() {
+        return super.stormpathAccessTokenConfig();
+    }
+
+    /**
+     * @since 1.2.0
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public GrantTypeValidator stormpathGrantTypeStatusValidator() {
+        return super.stormpathGrantTypeStatusValidator();
     }
 }

@@ -19,11 +19,11 @@ import com.stormpath.sdk.account.Account;
 import com.stormpath.sdk.account.AccountStatus;
 import com.stormpath.sdk.application.Application;
 import com.stormpath.sdk.authc.AuthenticationResult;
+import com.stormpath.sdk.cache.Cache;
 import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.directory.AccountStore;
 import com.stormpath.sdk.directory.AccountStoreVisitorAdapter;
 import com.stormpath.sdk.directory.Directory;
-import com.stormpath.sdk.group.Group;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.organization.Organization;
 import com.stormpath.sdk.servlet.account.event.impl.DefaultRegisteredAccountRequestEvent;
@@ -46,15 +46,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.stormpath.sdk.servlet.mvc.View.STORMPATH_JSON_VIEW_NAME;
-
 /**
  * @since 1.0.RC4
  */
 public class RegisterController extends FormController {
 
     private static final Logger log = LoggerFactory.getLogger(RegisterController.class);
-    public static final List<String> ACCOUNT_PROPERTIES = Collections.unmodifiableList(Arrays.asList("email", "username", "password", "givenName", "middleName", "surname"));
+    public static final List<String> ACCOUNT_PROPERTIES = Collections.unmodifiableList(Arrays.asList("email", "username", "password", "confirmPassword", "givenName", "middleName", "surname"));
 
     private boolean autoLogin;
     private String loginUri;
@@ -261,6 +259,10 @@ public class RegisterController extends FormController {
         }
 
         AccountStatus status = account.getStatus();
+        if (status == AccountStatus.UNVERIFIED) {
+            // purge account from cache in case status is updated on the backend
+            invalidateAccountCache(account);
+        }
 
         if (isJsonPreferred(req, resp)) {
             //noinspection unchecked
@@ -280,6 +282,13 @@ public class RegisterController extends FormController {
             return new DefaultViewModel(loginUri + "?status=unverified").setRedirect(true);
         }
         return new DefaultViewModel(nextUri).setRedirect(true);
+    }
+
+    // resolves https://github.com/stormpath/stormpath-sdk-java/issues/1198
+    @SuppressWarnings("unchecked")
+    private void invalidateAccountCache(Account account) {
+        Cache accountCache = client.getCacheManager().getCache(Account.class.getName());
+        accountCache.remove(account.getHref());
     }
 
     private Map<String, Object> getCustomData(HttpServletRequest request, Form form) {

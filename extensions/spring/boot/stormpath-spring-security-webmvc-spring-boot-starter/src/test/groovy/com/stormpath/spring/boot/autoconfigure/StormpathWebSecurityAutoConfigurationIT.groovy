@@ -26,26 +26,25 @@ import com.stormpath.sdk.oauth.OAuthPasswordGrantRequestAuthentication
 import com.stormpath.sdk.oauth.OAuthRequests
 import com.stormpath.sdk.resource.Deletable
 import com.stormpath.sdk.servlet.authc.impl.DefaultLogoutRequestEvent
-import com.stormpath.sdk.servlet.client.ClientLoader
 import com.stormpath.sdk.servlet.config.CookieConfig
 import com.stormpath.sdk.servlet.csrf.CsrfTokenManager
 import com.stormpath.sdk.servlet.event.RequestEventListener
 import com.stormpath.sdk.servlet.event.TokenRevocationRequestEventListener
 import com.stormpath.sdk.servlet.event.impl.RequestEventPublisher
 import com.stormpath.sdk.servlet.filter.UsernamePasswordRequestFactory
+import com.stormpath.sdk.servlet.filter.account.AccountResolverFilter
 import com.stormpath.sdk.servlet.filter.oauth.AccessTokenResultFactory
 import com.stormpath.sdk.servlet.http.Resolver
 import com.stormpath.sdk.servlet.http.authc.AccountStoreResolver
 import com.stormpath.sdk.servlet.mvc.Controller
 import com.stormpath.spring.config.TwoAppTenantStormpathTestConfiguration
 import com.stormpath.spring.csrf.SpringSecurityCsrfTokenManager
-import com.stormpath.spring.filter.SpringSecurityResolvedAccountFilter
-import com.stormpath.spring.oauth.OAuthAuthenticationSpringSecurityProcessingFilter
+import com.stormpath.spring.filter.StormpathWrapperFilter
 import com.stormpath.spring.security.authz.CustomDataPermissionsEditor
 import com.stormpath.spring.security.provider.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.test.SpringApplicationConfiguration
+import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.security.access.PermissionEvaluator
 import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler
 import org.springframework.security.authentication.AuthenticationManager
@@ -53,8 +52,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.userdetails.UserDetails
+import org.springframework.security.web.csrf.CsrfTokenRepository
+import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository
 import org.springframework.test.context.testng.AbstractTestNGSpringContextTests
-import org.springframework.test.context.web.WebAppConfiguration
 import org.springframework.web.servlet.HandlerInterceptor
 import org.springframework.web.servlet.HandlerMapping
 import org.testng.annotations.AfterClass
@@ -71,8 +71,7 @@ import static org.testng.Assert.*
 /**
  * @since 1.0.RC5
  */
-@SpringApplicationConfiguration(classes = [StormpathWebSecurityAutoConfigurationTestApplication.class, TwoAppTenantStormpathTestConfiguration.class])
-@WebAppConfiguration
+@SpringBootTest(classes = [StormpathWebSecurityAutoConfigurationTestApplication.class, TwoAppTenantStormpathTestConfiguration.class])
 class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContextTests {
 
     @Autowired
@@ -82,10 +81,10 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
     Application application;
 
     @Autowired
-    OAuthAuthenticationSpringSecurityProcessingFilter oauth2AuthenticationSpringSecurityProcessingFilter;
+    AccountResolverFilter springSecurityResolvedAccountFilter;
 
     @Autowired
-    SpringSecurityResolvedAccountFilter springSecurityResolvedAccountFilter;
+    StormpathWrapperFilter stormpathWrapperFilter;
 
     //Spring Security Bean
     @Autowired
@@ -134,6 +133,9 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
     CsrfTokenManager csrfTokenManager
 
     @Autowired
+    CsrfTokenRepository csrfTokenRepository
+
+    @Autowired
     AuthenticationManager authenticationManager
 
     @Autowired
@@ -156,9 +158,12 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
         assertTrue stormpathAuthenticationProvider.authenticationTokenFactory instanceof UsernamePasswordAuthenticationTokenFactory
 
         assertNotNull springSecurityResolvedAccountFilter
-        assertNotNull springSecurityResolvedAccountFilter
-        assertNotNull oauth2AuthenticationSpringSecurityProcessingFilter
-        assertNotNull oauth2AuthenticationSpringSecurityProcessingFilter.authenticationProvider
+        assertNotNull stormpathWrapperFilter
+        assertNotNull stormpathWrapperFilter.client
+        assertNotNull stormpathWrapperFilter.application
+        assertTrue stormpathWrapperFilter.applicationRequestAttributeNameList.size() > 0
+        assertTrue stormpathWrapperFilter.applicationRequestAttributeNameList.size() > 0
+        assertNotNull stormpathWrapperFilter.wrappedServletRequestFactory
 
         assertNotNull stormpathWildcardPermissionEvaluator
         assertNotNull stormpathMethodSecurityExpressionHandler
@@ -180,6 +185,7 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
     @Test
     void testCsrfTokenManager() {
         assertTrue (csrfTokenManager instanceof SpringSecurityCsrfTokenManager)
+        assertTrue (csrfTokenRepository instanceof HttpSessionCsrfTokenRepository)
         assertEquals csrfTokenManager.tokenName, '_csrf'
     }
 
@@ -226,9 +232,8 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
         def accessToken = result.getAccessToken()
 
         expect(httpServletRequest.getHeader("Authorization")).andReturn("Bearer " + accessToken.getJwt())
-        expect(httpServletRequest.getServletContext()).andReturn(servletContext)
-        expect(httpServletRequest.getAttribute(Client.class.getName())).andReturn(client)
-        expect(servletContext.getAttribute(ClientLoader.CLIENT_ATTRIBUTE_KEY)).andReturn(client)
+        expect(httpServletRequest.getServletContext()).andReturn(servletContext).times(2)
+        expect(servletContext.getAttribute("com.stormpath.sdk.client.Client")).andReturn(client).times(2)
 
         replay(httpServletRequest, httpServletResponse, servletContext)
 
@@ -250,7 +255,7 @@ class StormpathWebSecurityAutoConfigurationIT extends AbstractTestNGSpringContex
     private Account createTempAccount(String password) {
         Account account = client.instantiate(Account.class)
         String username = "foo-account-deleteme-" + UUID.randomUUID();
-        account.setEmail(username + "@stormpath.com")
+        account.setEmail(username + "@testmail.stormpath.com")
         account.setUsername(username)
         account.setPassword(password)
         account.setGivenName(username)

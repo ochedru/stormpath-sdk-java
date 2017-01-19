@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Stormpath, Inc.
+ * Copyright 2016 Stormpath, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,45 +15,33 @@
  */
 package com.stormpath.sdk.impl.resource;
 
-import com.fasterxml.jackson.databind.util.ISO8601DateFormat;
 import com.stormpath.sdk.impl.ds.Enlistment;
 import com.stormpath.sdk.impl.ds.InternalDataStore;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.lang.Strings;
 import com.stormpath.sdk.resource.CollectionResource;
 import com.stormpath.sdk.resource.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.util.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.List;
 
 /**
  * @since 0.1
  */
-public abstract class AbstractResource implements Resource {
-
-    private static final Logger log = LoggerFactory.getLogger(AbstractResource.class);
-
-    private static final DateFormat dateFormatter = new ISO8601DateFormat();
+public abstract class AbstractResource extends AbstractPropertyRetriever implements Resource {
 
     public static final String HREF_PROP_NAME = "href";
-
-    protected Map<String, Object> properties;       //Protected by read/write lock
     protected final Map<String, Object> dirtyProperties;  //Protected by read/write lock
     protected final Set<String> deletedPropertyNames;     //Protected by read/write lock
-    private final InternalDataStore dataStore;
-    protected final Lock readLock;
-    protected final Lock writeLock;
-
-    private volatile boolean materialized;
-    protected volatile boolean dirty;
-
     protected final ReferenceFactory referenceFactory;
+    private final InternalDataStore dataStore;
+    protected Map<String, Object> properties;       //Protected by read/write lock
+    protected volatile boolean dirty;
+    private volatile boolean materialized;
 
     protected AbstractResource(InternalDataStore dataStore) {
         this(dataStore, null);
@@ -61,9 +49,6 @@ public abstract class AbstractResource implements Resource {
 
     protected AbstractResource(InternalDataStore dataStore, Map<String, Object> properties) {
         this.referenceFactory = new ReferenceFactory();
-        ReadWriteLock rwl = new ReentrantReadWriteLock();
-        this.readLock = rwl.readLock();
-        this.writeLock = rwl.writeLock();
         this.dataStore = dataStore;
         this.dirtyProperties = new LinkedHashMap<>();
         this.deletedPropertyNames = new HashSet<>();
@@ -82,7 +67,6 @@ public abstract class AbstractResource implements Resource {
      * @param props the data properties to test
      * @return {@code true} if the specified data map represents a materialized resource data set, {@code false}
      * otherwise.
-     *
      * @since 1.0.RC4.3
      */
     public static boolean isMaterialized(Map<String, ?> props) {
@@ -115,8 +99,8 @@ public abstract class AbstractResource implements Resource {
         try {
             this.dirtyProperties.clear();
             this.dirty = false;
-            if(properties != null && !properties.isEmpty()) {
-                if(this.properties instanceof Enlistment && this.properties != properties) {
+            if (properties != null && !properties.isEmpty()) {
+                if (this.properties instanceof Enlistment && this.properties != properties) {
                     this.properties.clear();
                     this.properties.putAll(properties);
                 } else {
@@ -173,12 +157,15 @@ public abstract class AbstractResource implements Resource {
         return !Strings.hasText(href);
     }
 
-    protected void materialize() {
+    public void materialize() {
+        if (this.materialized) {
+            return;
+        }
         AbstractResource resource = dataStore.getResource(getHref(), getClass());
         writeLock.lock();
         try {
             if (this.properties != resource.properties) {
-                if (! (this.properties instanceof Enlistment)) {
+                if (!(this.properties instanceof Enlistment)) {
                     this.properties = resource.properties;
                 } else {
                     this.properties.clear();
@@ -249,31 +236,37 @@ public abstract class AbstractResource implements Resource {
         return readProperty(name);
     }
 
+    /**
+     * Returns {@code true} if this resource has a property with the specified name, {@code false} otherwise.
+     *
+     * @param name the name of the property to check for existence
+     * @return {@code true} if this resource has a property with the specified name, {@code false} otherwise.
+     * @since 1.3.0
+     */
+    public boolean hasProperty(String name) {
+        readLock.lock();
+        try {
+            return !this.deletedPropertyNames.contains(name) &&
+                (this.dirtyProperties.containsKey(name) || this.properties.containsKey(name));
+        } finally {
+            readLock.unlock();
+        }
+    }
+
     private Object readProperty(String name) {
         readLock.lock();
         try {
-            if(this.deletedPropertyNames.contains(name)){
+            if (this.deletedPropertyNames.contains(name)) {
                 return null;
             }
             Object value = this.dirtyProperties.get(name);
-            if(value == null) {
+            if (value == null) {
                 value = this.properties.get(name);
             }
             return value;
         } finally {
             readLock.unlock();
         }
-    }
-
-    /**
-     * @since 0.8
-     */
-    protected void setProperty(Property property, Object value) {
-        setProperty(property.getName(), value, true);
-    }
-
-    protected void setProperty(String name, Object value) {
-        setProperty(name, value, true);
     }
 
     /**
@@ -305,21 +298,20 @@ public abstract class AbstractResource implements Resource {
         Object previous;
         try {
             previous = this.dirtyProperties.put(name, value);
-            if(previous == null) {
+            if (previous == null) {
                 previous = this.properties.get(name);
             }
             this.dirty = dirty;
 
-            /**
+            /*
              * The instance variable "deletedPropertyNames" is overloaded here.
              * For "CustomData" value=null means that the property/field has been deleted from custom data,
              * hence it is added to "deletedPropertyNames". See DefaultCustomData.java
              * In this case, where value=null and the field is nullable, adding it to "deletedPropertyNames" forces
              * and makes sure that the property is saved with value=null (but not deleted).
              * e.g. matchingProperty in AccountLinkingPolicy
-             *
              */
-            if(isNullable && value == null) { //fix for https://github.com/stormpath/stormpath-sdk-java/issues/966
+            if (isNullable && value == null) { //fix for https://github.com/stormpath/stormpath-sdk-java/issues/966
                 this.deletedPropertyNames.add(name);
             } else {
                 if (this.deletedPropertyNames.contains(name)) {
@@ -330,83 +322,6 @@ public abstract class AbstractResource implements Resource {
             writeLock.unlock();
         }
         return previous;
-    }
-
-
-    /**
-     * @since 0.8
-     */
-    protected String getString(StringProperty property) {
-        return getStringProperty(property.getName());
-    }
-
-    protected String getStringProperty(String key) {
-        Object value = getProperty(key);
-        if (value == null) {
-            return null;
-        }
-        return String.valueOf(value);
-    }
-
-    protected Date getDateProperty(DateProperty key) {
-        Object value = getProperty(key.getName());
-        if (value == null) {
-            return null;
-        }
-
-        try {
-            return dateFormatter.parse(String.valueOf(value));
-        } catch (ParseException e) {
-            if (log.isErrorEnabled()) {
-                String msg = "Unabled to parse string '{}' into an date value.  Defaulting to null.";
-                log.error(msg, e);
-            }
-        }
-        return null;
-    }
-
-    /**
-     * @since 0.8
-     */
-    protected int getInt(IntegerProperty property) {
-        return getIntProperty(property.getName());
-    }
-
-    protected int getIntProperty(String key) {
-        Object value = getProperty(key);
-        if (value != null) {
-            if (value instanceof String) {
-                return parseInt((String) value);
-            } else if (value instanceof Number) {
-                return ((Number) value).intValue();
-            }
-        }
-        return -1;
-    }
-
-    /**
-     * @since 0.9
-     */
-    protected boolean getBoolean(BooleanProperty property) {
-        return getBooleanProperty(property.getName());
-    }
-
-    /**
-     * Returns an actual boolean value instead of a possible null Boolean value since desired usage
-     * is to have either a true or false.
-     *
-     * @since 0.9
-     */
-    protected boolean getBooleanProperty(String key) {
-        Object value = getProperty(key);
-        if (value != null) {
-            if (value instanceof Boolean) {
-                return (Boolean) value;
-            } else if (value instanceof String) {
-                return Boolean.valueOf((String) value);
-            }
-        }
-        return Boolean.FALSE;
     }
 
     /**
@@ -437,7 +352,7 @@ public abstract class AbstractResource implements Resource {
         }
 
         String msg = "'" + key + "' property value type does not match the specified type.  Specified type: " +
-                clazz.getName() + ".  Existing type: " + value.getClass().getName();
+            clazz.getName() + ".  Existing type: " + value.getClass().getName();
         msg += (isPrintableProperty(key) ? ".  Value: " + value : ".");
         throw new IllegalArgumentException(msg);
     }
@@ -445,7 +360,7 @@ public abstract class AbstractResource implements Resource {
     /**
      * Returns the {@link List} property identified by {@code key}
      *
-     * @since 1.0.RC8
+     * @since 1.3.0
      */
     protected List getListProperty(String key){
         Object list = getProperty(key);
@@ -455,10 +370,13 @@ public abstract class AbstractResource implements Resource {
     /**
      * Returns the {@link Set} property identified by {@code key}
      *
-     * @since 1.0.RC8
+     * @since 1.3.0
      */
-    protected Set getSetProperty(String key){
+    protected Set getSetProperty(String key) {
         Object set = getProperty(key);
+        if (set instanceof List) {
+            return new HashSet((List) set);
+        }
         return (Set) set;
     }
 
@@ -511,8 +429,9 @@ public abstract class AbstractResource implements Resource {
      * This method is able to set a Reference to a resource (<code>value</code>) even though resource has not yet an href value
      * <p>Note that this is method is analogous to the {@link #setResourceProperty(ResourceReference, Resource)} method (in fact
      * it relies on it when the resource alredy has an href value) but this method does not complain when the href of the resource is missing.</p>
+     *
      * @param property the property whose value is going to be set to <code>value</code>
-     * @param value the value to be set to <code>property</code>
+     * @param value    the value to be set to <code>property</code>
      * @since 1.1.0
      */
     protected <T extends Resource> void setMaterializableResourceProperty(ResourceReference<T> property, Resource value) {
@@ -525,42 +444,6 @@ public abstract class AbstractResource implements Resource {
             Map<String, String> reference = this.referenceFactory.createUnmaterializedReference(name, value);
             setProperty(name, reference);
         }
-    }
-
-    /**
-     * @since 1.0.RC4
-     */
-    protected Map getMap(MapProperty mapProperty) {
-        return getMapProperty(mapProperty.getName());
-    }
-
-    /**
-     * @since 1.0.RC4
-     */
-    protected Map getMapProperty(String key) {
-        Object value = getProperty(key);
-        if (value != null) {
-            if (value instanceof Map) {
-                return (Map) value;
-            }
-            String msg = "'" + key + "' property value type does not match the specified type. Specified type: Map. " +
-                    "Existing type: " + value.getClass().getName();
-            msg += (isPrintableProperty(key) ? ".  Value: " + value : ".");
-            throw new IllegalArgumentException(msg);
-        }
-        return null;
-    }
-
-    private int parseInt(String value) {
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            if (log.isErrorEnabled()) {
-                String msg = "Unabled to parse string '{}' into an integer value.  Defaulting to -1";
-                log.error(msg, e);
-            }
-        }
-        return -1;
     }
 
     public String toString() {
@@ -628,4 +511,10 @@ public abstract class AbstractResource implements Resource {
             readLock.unlock();
         }
     }
+
+    @Override
+    protected Map<String, Object> getProperties() {
+        return properties;
+    }
+
 }

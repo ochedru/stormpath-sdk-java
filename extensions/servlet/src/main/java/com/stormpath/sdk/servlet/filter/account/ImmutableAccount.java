@@ -146,6 +146,17 @@ public class ImmutableAccount implements Account {
     }
 
     @Override
+    public EmailVerificationStatus getEmailVerificationStatus() {
+        return account.getEmailVerificationStatus();
+    }
+
+    @Override
+    public Account setEmailVerificationStatus(EmailVerificationStatus emailVerificationStatus) {
+        immutable();
+        return null;
+    }
+
+    @Override
     public GroupList getGroups() {
         return account.getGroups();
     }
@@ -460,4 +471,14 @@ public class ImmutableAccount implements Account {
     public PhoneList getPhones(PhoneCriteria criteria) {
         return account.getPhones(criteria);
     }
+
+    /**
+     * @since 1.2.0
+     */
+    @Override
+    public Date getPasswordModifiedAt() {
+        return account.getPasswordModifiedAt();
+    }
+
+
 }
