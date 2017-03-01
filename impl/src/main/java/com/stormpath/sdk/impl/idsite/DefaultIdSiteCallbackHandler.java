@@ -26,9 +26,9 @@ import com.stormpath.sdk.idsite.AuthenticationResult;
 import com.stormpath.sdk.idsite.IDSiteRuntimeException;
 import com.stormpath.sdk.idsite.IdSiteCallbackHandler;
 import com.stormpath.sdk.idsite.IdSiteResultListener;
+import com.stormpath.sdk.idsite.IdSiteResultStatus;
 import com.stormpath.sdk.idsite.NonceStore;
 import com.stormpath.sdk.idsite.RegistrationResult;
-import com.stormpath.sdk.idsite.IdSiteResultStatus;
 import com.stormpath.sdk.impl.account.DefaultAccountResult;
 import com.stormpath.sdk.impl.account.DefaultAuthenticationResult;
 import com.stormpath.sdk.impl.account.DefaultLogoutResult;
@@ -37,22 +37,20 @@ import com.stormpath.sdk.impl.authc.HttpServletRequestWrapper;
 import com.stormpath.sdk.impl.ds.InternalDataStore;
 import com.stormpath.sdk.impl.error.DefaultError;
 import com.stormpath.sdk.impl.http.HttpHeaders;
+import static com.stormpath.sdk.impl.idsite.IdSiteClaims.*;
+import static com.stormpath.sdk.impl.jwt.JwtHeaderParameters.KEY_ID;
 import com.stormpath.sdk.impl.jwt.JwtSignatureValidator;
 import com.stormpath.sdk.impl.jwt.JwtWrapper;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.lang.Classes;
 import com.stormpath.sdk.lang.Strings;
 import io.jsonwebtoken.Claims;
-
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.stormpath.sdk.impl.idsite.IdSiteClaims.*;
-import static com.stormpath.sdk.impl.jwt.JwtHeaderParameters.KEY_ID;
 
 /**
  * @since 1.0.RC2
@@ -155,6 +153,13 @@ public class DefaultIdSiteCallbackHandler implements IdSiteCallbackHandler {
             Map<String, Object> account = new HashMap<String, Object>();
             account.put(DefaultAccountResult.HREF_PROP_NAME, accountHref);
             properties.put(DefaultAccountResult.ACCOUNT.getName(), account);
+        }
+
+        String invitationHref = getOptionalValue(jsonPayload, "inv_href");
+        if(Strings.hasText(invitationHref)){
+            Map<String, Object> invitation = new HashMap<String, Object>();
+            invitation.put(DefaultAccountResult.HREF_PROP_NAME, invitationHref);
+            properties.put(DefaultAccountResult.INVITATION.getName(), invitation);
         }
 
         AccountResult accountResult = new DefaultAccountResult(dataStore, properties);

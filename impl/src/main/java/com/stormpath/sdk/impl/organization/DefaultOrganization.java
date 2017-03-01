@@ -18,32 +18,34 @@ package com.stormpath.sdk.impl.organization;
 import com.stormpath.sdk.account.*;
 import com.stormpath.sdk.directory.AccountStore;
 import com.stormpath.sdk.directory.AccountStoreVisitor;
+import com.stormpath.sdk.directory.Directories;
 import com.stormpath.sdk.directory.Directory;
 import com.stormpath.sdk.directory.DirectoryCriteria;
-import com.stormpath.sdk.directory.Directories;
 import com.stormpath.sdk.directory.DirectoryList;
-import com.stormpath.sdk.group.Group;
-import com.stormpath.sdk.group.Groups;
-import com.stormpath.sdk.group.GroupCriteria;
 import com.stormpath.sdk.group.CreateGroupRequest;
+import com.stormpath.sdk.group.Group;
+import com.stormpath.sdk.group.GroupCriteria;
 import com.stormpath.sdk.group.GroupList;
+import com.stormpath.sdk.group.Groups;
 import com.stormpath.sdk.impl.ds.InternalDataStore;
 import com.stormpath.sdk.impl.resource.AbstractExtendableInstanceResource;
-import com.stormpath.sdk.impl.resource.EnumProperty;
-import com.stormpath.sdk.impl.resource.StringProperty;
-import com.stormpath.sdk.impl.resource.ResourceReference;
 import com.stormpath.sdk.impl.resource.CollectionReference;
+import com.stormpath.sdk.impl.resource.EnumProperty;
 import com.stormpath.sdk.impl.resource.Property;
+import com.stormpath.sdk.impl.resource.ResourceReference;
+import com.stormpath.sdk.impl.resource.StringProperty;
+import com.stormpath.sdk.invitation.Invitation;
+import com.stormpath.sdk.invitation.InvitationCriteria;
+import com.stormpath.sdk.invitation.InvitationList;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.organization.Organization;
 import com.stormpath.sdk.organization.OrganizationAccountStoreMapping;
+import com.stormpath.sdk.organization.OrganizationAccountStoreMappingCriteria;
 import com.stormpath.sdk.organization.OrganizationAccountStoreMappingList;
 import com.stormpath.sdk.organization.OrganizationStatus;
-import com.stormpath.sdk.organization.OrganizationAccountStoreMappingCriteria;
 import com.stormpath.sdk.query.Criteria;
 import com.stormpath.sdk.resource.ResourceException;
 import com.stormpath.sdk.tenant.Tenant;
-
 import java.util.Map;
 
 /**
@@ -76,10 +78,12 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
         new CollectionReference<AccountList, Account>("accounts", AccountList.class, Account.class);
     static final CollectionReference<GroupList, Group>                             GROUPS                 =
         new CollectionReference<GroupList, Group>("groups", GroupList.class, Group.class);
+    static final CollectionReference<InvitationList, Invitation>                             INVITATIONS                 =
+        new CollectionReference<InvitationList, Invitation>("invitations", InvitationList.class, Invitation.class);
 
 
     private static final Map<String, Property> PROPERTY_DESCRIPTORS = createPropertyDescriptorMap(
-            NAME, DESCRIPTION, NAME_KEY, STATUS, TENANT, CUSTOM_DATA, DEFAULT_ACCOUNT_STORE_MAPPING, DEFAULT_GROUP_STORE_MAPPING, ACCOUNT_STORE_MAPPINGS, ACCOUNT_LINKING_POLICY);
+            NAME, DESCRIPTION, NAME_KEY, STATUS, TENANT, CUSTOM_DATA, DEFAULT_ACCOUNT_STORE_MAPPING, DEFAULT_GROUP_STORE_MAPPING, ACCOUNT_STORE_MAPPINGS, ACCOUNT_LINKING_POLICY, ACCOUNTS, GROUPS, INVITATIONS);
 
     public DefaultOrganization(InternalDataStore dataStore) {
         super(dataStore);
@@ -395,7 +399,7 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
     public AccountLinkingPolicy getAccountLinkingPolicy() {
         return getResourceProperty(ACCOUNT_LINKING_POLICY);
     }
-    
+
     @Override
     public AccountList getAccounts() {
         return getResourceProperty(ACCOUNTS);
@@ -412,7 +416,7 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
         AccountList list = getAccounts();  //safe to get the href: does not execute a query until iteration occurs
         return getDataStore().getResource(list.getHref(), AccountList.class, (Criteria<AccountCriteria>) criteria);
     }
-    
+
     @Override
     public GroupList getGroups() {
         return getResourceProperty(GROUPS);
@@ -428,5 +432,22 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
     public GroupList getGroups(GroupCriteria criteria) {
         GroupList groups = getGroups(); //safe to get the href: does not execute a query until iteration occurs
         return getDataStore().getResource(groups.getHref(), GroupList.class, (Criteria<GroupCriteria>) criteria);
+    }
+
+    @Override
+    public InvitationList getInvitations() {
+        return getResourceProperty(INVITATIONS);
+    }
+
+    @Override
+    public InvitationList getInvitations(Map<String, Object> queryParams) {
+        InvitationList list = getInvitations(); //safe to get the href: does not execute a query until iteration occurs
+        return getDataStore().getResource(list.getHref(), InvitationList.class, queryParams);
+    }
+
+    @Override
+    public InvitationList getInvitations(InvitationCriteria criteria) {
+        InvitationList list = getInvitations(); //safe to get the href: does not execute a query until iteration occurs
+        return getDataStore().getResource(list.getHref(), InvitationList.class, (Criteria<InvitationCriteria>) criteria);
     }
 }

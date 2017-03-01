@@ -43,20 +43,18 @@ import com.stormpath.sdk.impl.resource.AbstractExtendableInstanceResource;
 import com.stormpath.sdk.impl.resource.CollectionReference;
 import com.stormpath.sdk.impl.resource.Property;
 import com.stormpath.sdk.impl.resource.StringProperty;
+import com.stormpath.sdk.invitation.Invitation;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.organization.*;
 import com.stormpath.sdk.phone.Phone;
 import com.stormpath.sdk.phone.PhoneList;
 import com.stormpath.sdk.query.Criteria;
 import com.stormpath.sdk.resource.ResourceException;
-import com.stormpath.sdk.saml.RegisteredSamlServiceProviderList;
 import com.stormpath.sdk.saml.RegisteredSamlServiceProvider;
-import com.stormpath.sdk.saml.SamlServiceProviderRegistrationList;
-import com.stormpath.sdk.saml.SamlServiceProviderRegistration;
 import com.stormpath.sdk.saml.RegisteredSamlServiceProviderCriteria;
+import com.stormpath.sdk.saml.RegisteredSamlServiceProviderList;
 import com.stormpath.sdk.tenant.Tenant;
 import com.stormpath.sdk.tenant.TenantOptions;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -359,5 +357,11 @@ public class DefaultTenant extends AbstractExtendableInstanceResource implements
     public RegisteredSamlServiceProviderList getRegisterdSamlServiceProviders(RegisteredSamlServiceProviderCriteria criteria) {
         RegisteredSamlServiceProviderList proxy = getRegisterdSamlServiceProviders(); //just a proxy - does not execute a query until iteration occurs
         return getDataStore().getResource(proxy.getHref(), RegisteredSamlServiceProviderList.class, (Criteria<RegisteredSamlServiceProviderCriteria>) criteria);
+    }
+
+    @Override
+    public Invitation createInvitation(Invitation invitation) {
+        Assert.notNull(invitation, "Invitation instance cannot be null.");
+        return getDataStore().create("/invitations", invitation);
     }
 }

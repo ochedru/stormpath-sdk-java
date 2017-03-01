@@ -16,6 +16,7 @@
 package com.stormpath.sdk.idsite;
 
 import com.stormpath.sdk.account.Account;
+import com.stormpath.sdk.invitation.Invitation;
 
 /**
  * Represents the result of an ID Site callback redirect, obtained after the end-user has used the ID Site and has been
@@ -61,4 +62,6 @@ public interface AccountResult {
     IdSiteResultStatus getStatus();
 
     void setStatus(IdSiteResultStatus status);
+
+    Invitation getInvitation();
 }

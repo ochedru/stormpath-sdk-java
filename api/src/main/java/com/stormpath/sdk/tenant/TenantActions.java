@@ -28,13 +28,13 @@ package com.stormpath.sdk.tenant;
  import com.stormpath.sdk.directory.DirectoryList;
  import com.stormpath.sdk.group.GroupCriteria;
  import com.stormpath.sdk.group.GroupList;
+import com.stormpath.sdk.invitation.Invitation;
  import com.stormpath.sdk.organization.CreateOrganizationRequest;
  import com.stormpath.sdk.organization.Organization;
  import com.stormpath.sdk.organization.OrganizationCriteria;
  import com.stormpath.sdk.organization.OrganizationList;
  import com.stormpath.sdk.resource.ResourceException;
  import com.stormpath.sdk.saml.*;
-
  import java.util.Map;
 
 /**
@@ -476,5 +476,7 @@ public interface TenantActions {
      * @since 1.3.0
      */
     RegisteredSamlServiceProviderList getRegisterdSamlServiceProviders(RegisteredSamlServiceProviderCriteria criteria);
+
+    Invitation createInvitation(Invitation invitation);
 }
 

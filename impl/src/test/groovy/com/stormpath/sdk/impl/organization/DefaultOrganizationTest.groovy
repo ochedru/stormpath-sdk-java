@@ -44,7 +44,7 @@ class DefaultOrganizationTest {
 
         def propertyDescriptors = defaultOrganization.getPropertyDescriptors()
 
-        assertEquals(propertyDescriptors.size(), 10)
+        assertEquals(propertyDescriptors.size(), 13)
 
         assertTrue(propertyDescriptors.get("name") instanceof StringProperty)
         assertTrue(propertyDescriptors.get("nameKey") instanceof StringProperty)

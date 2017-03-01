@@ -9,7 +9,7 @@ import com.stormpath.sdk.impl.resource.BooleanProperty;
 import com.stormpath.sdk.impl.resource.Property;
 import com.stormpath.sdk.impl.resource.ResourceReference;
 import com.stormpath.sdk.impl.resource.StringProperty;
-
+import com.stormpath.sdk.invitation.Invitation;
 import java.util.Map;
 
 /**
@@ -26,6 +26,7 @@ public class DefaultAccountResult extends AbstractResource implements AccountRes
 
     // INSTANCE RESOURCE REFERENCES:
     public static final ResourceReference<Account> ACCOUNT = new ResourceReference<Account>("account", Account.class);
+    public static final ResourceReference<Invitation> INVITATION = new ResourceReference<Invitation>("invitation", Invitation.class);
 
     private static final Map<String, Property> PROPERTY_DESCRIPTORS = createPropertyDescriptorMap(NEW_ACCOUNT, ACCOUNT);
 
@@ -63,9 +64,14 @@ public class DefaultAccountResult extends AbstractResource implements AccountRes
     public IdSiteResultStatus getStatus() {
         return status;
     }
-    
+
     @Override
     public void setStatus(IdSiteResultStatus status) {
         this.status = status;
+    }
+
+    @Override
+    public Invitation getInvitation() {
+        return getResourceProperty(INVITATION);
     }
 }

@@ -26,8 +26,6 @@ import com.stormpath.sdk.application.CreateApplicationRequest;
 import com.stormpath.sdk.cache.CacheManager;
 import com.stormpath.sdk.client.AuthenticationScheme;
 import com.stormpath.sdk.client.Client;
-import com.stormpath.sdk.impl.api.ApiKeyResolver;
-import com.stormpath.sdk.impl.authc.credentials.ClientCredentials;
 import com.stormpath.sdk.client.Proxy;
 import com.stormpath.sdk.directory.CreateDirectoryRequest;
 import com.stormpath.sdk.directory.Directory;
@@ -36,12 +34,15 @@ import com.stormpath.sdk.directory.DirectoryList;
 import com.stormpath.sdk.ds.DataStore;
 import com.stormpath.sdk.group.GroupCriteria;
 import com.stormpath.sdk.group.GroupList;
+import com.stormpath.sdk.impl.api.ApiKeyResolver;
+import com.stormpath.sdk.impl.authc.credentials.ClientCredentials;
 import com.stormpath.sdk.impl.ds.DefaultDataStore;
 import com.stormpath.sdk.impl.http.RequestExecutor;
 import com.stormpath.sdk.impl.http.authc.RequestAuthenticatorFactory;
 import com.stormpath.sdk.impl.tenant.DefaultTenantResolver;
 import com.stormpath.sdk.impl.tenant.TenantResolver;
 import com.stormpath.sdk.impl.util.BaseUrlResolver;
+import com.stormpath.sdk.invitation.Invitation;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.lang.Classes;
 import com.stormpath.sdk.organization.*;
@@ -51,7 +52,6 @@ import com.stormpath.sdk.resource.ResourceException;
 import com.stormpath.sdk.saml.*;
 import com.stormpath.sdk.tenant.Tenant;
 import com.stormpath.sdk.tenant.TenantOptions;
-
 import java.lang.reflect.Constructor;
 import java.util.Map;
 
@@ -481,5 +481,10 @@ public class DefaultClient implements Client {
     @Override
     public RegisteredSamlServiceProviderList getRegisterdSamlServiceProviders(RegisteredSamlServiceProviderCriteria criteria) {
         return getCurrentTenant().getRegisterdSamlServiceProviders(criteria);
+    }
+
+    @Override
+    public Invitation createInvitation(Invitation invitation) {
+        return getCurrentTenant().createInvitation(invitation);
     }
 }
