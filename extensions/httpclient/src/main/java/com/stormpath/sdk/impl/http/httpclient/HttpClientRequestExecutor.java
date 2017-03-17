@@ -32,6 +32,13 @@ import com.stormpath.sdk.impl.http.support.BackoffStrategy;
 import com.stormpath.sdk.impl.http.support.DefaultRequest;
 import com.stormpath.sdk.impl.http.support.DefaultResponse;
 import com.stormpath.sdk.lang.Assert;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.URI;
+import java.util.Random;
 import org.apache.http.Consts;
 import org.apache.http.Header;
 import org.apache.http.HeaderElement;
@@ -57,14 +64,6 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.net.URI;
-import java.util.Random;
 
 /**
  * {@code RequestExecutor} implementation that uses the
@@ -298,7 +297,7 @@ public class HttpClientRequestExecutor implements RequestExecutor {
                     Header[] locationHeaders = httpResponse.getHeaders("Location");
                     String location = locationHeaders[0].getValue();
                     log.debug("Redirecting to: {}", location);
-                    redirectUri = URI.create(location);
+                    redirectUri = request.getResourceUrl().resolve(location);
                     httpRequest.setURI(redirectUri);
                 } else {
 
