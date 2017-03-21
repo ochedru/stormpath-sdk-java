@@ -15,6 +15,8 @@
  */
 package com.stormpath.sdk.saml;
 
+import com.stormpath.sdk.invitation.Invitation;
+
 /**
  * A <a href="http://en.wikipedia.org/wiki/Builder_pattern">Builder design pattern</a> used to construct a URL you can
  * use to redirect application users to a SAML authentication site (Identity Provider or IdP) for performing common user
@@ -107,6 +109,8 @@ public interface SamlIdpUrlBuilder {
      */
     SamlIdpUrlBuilder setAccountStoreHref(String accountStoreHref);
 
+    SamlIdpUrlBuilder setInvitation(Invitation invitation);
+
     /**
      * Convenience method to set any key value. This is important to decouple the server releases from the library
      * releases, when a new property is supported in the initial SAML Identity Provider call, and there is no {@code setter} to
@@ -129,7 +133,7 @@ public interface SamlIdpUrlBuilder {
      *
      * @param name  of the new property.
      * @param value of the new property.
-     * @return this instance for method chaining.     
+     * @return this instance for method chaining.
      */
     SamlIdpUrlBuilder addProperty(String name, Object value);
 

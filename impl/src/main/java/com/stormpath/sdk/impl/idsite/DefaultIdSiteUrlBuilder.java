@@ -19,18 +19,17 @@ import com.stormpath.sdk.api.ApiKey;
 import com.stormpath.sdk.idsite.IdSiteUrlBuilder;
 import com.stormpath.sdk.impl.ds.InternalDataStore;
 import com.stormpath.sdk.impl.http.QueryString;
+import static com.stormpath.sdk.impl.idsite.IdSiteClaims.JWT_REQUEST;
+import com.stormpath.sdk.invitation.Invitation;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.lang.Strings;
 import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-
+import java.lang.reflect.Method;
 import java.util.Date;
 import java.util.UUID;
-
-import static com.stormpath.sdk.impl.idsite.IdSiteClaims.JWT_REQUEST;
-import java.lang.reflect.Method;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -165,6 +164,14 @@ public class DefaultIdSiteUrlBuilder implements IdSiteUrlBuilder {
         }
         throw new IllegalStateException("IDSite base URL could not be constructed.");
 
+    }
+
+    @Override
+    public IdSiteUrlBuilder setInvitation(Invitation invitation) {
+        if(invitation != null){
+            return addProperty("inv_href", invitation.getHref());
+        }
+        return this;
     }
 
 }

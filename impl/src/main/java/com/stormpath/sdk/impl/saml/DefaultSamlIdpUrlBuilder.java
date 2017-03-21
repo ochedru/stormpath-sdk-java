@@ -18,6 +18,8 @@ package com.stormpath.sdk.impl.saml;
 import com.stormpath.sdk.api.ApiKey;
 import com.stormpath.sdk.impl.ds.InternalDataStore;
 import com.stormpath.sdk.impl.http.QueryString;
+import static com.stormpath.sdk.impl.idsite.IdSiteClaims.ACCESS_TOKEN;
+import com.stormpath.sdk.invitation.Invitation;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.lang.Strings;
 import com.stormpath.sdk.saml.SamlIdpUrlBuilder;
@@ -25,11 +27,8 @@ import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-
 import java.util.Date;
 import java.util.UUID;
-
-import static com.stormpath.sdk.impl.idsite.IdSiteClaims.ACCESS_TOKEN;
 
 /**
  * @since 1.0.RC8
@@ -127,5 +126,13 @@ public class DefaultSamlIdpUrlBuilder implements SamlIdpUrlBuilder {
         }
 
         return urlBuilder.append('?').append(queryString.toString()).toString();
+    }
+
+    @Override
+    public SamlIdpUrlBuilder setInvitation(Invitation invitation) {
+        if(invitation != null){
+            return addProperty("inv_href", invitation.getHref());
+        }
+        return this;
     }
 }

@@ -31,6 +31,8 @@ import com.stormpath.sdk.impl.ds.InternalDataStore;
 import com.stormpath.sdk.impl.error.DefaultError;
 import com.stormpath.sdk.impl.http.HttpHeaders;
 import com.stormpath.sdk.impl.idsite.DefaultNonceStore;
+import static com.stormpath.sdk.impl.idsite.IdSiteClaims.*;
+import static com.stormpath.sdk.impl.jwt.JwtHeaderParameters.KEY_ID;
 import com.stormpath.sdk.impl.jwt.JwtSignatureValidator;
 import com.stormpath.sdk.impl.jwt.JwtWrapper;
 import com.stormpath.sdk.lang.Assert;
@@ -40,16 +42,12 @@ import com.stormpath.sdk.saml.SamlCallbackHandler;
 import com.stormpath.sdk.saml.SamlResultListener;
 import com.stormpath.sdk.saml.SamlRuntimeException;
 import io.jsonwebtoken.Claims;
-
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.stormpath.sdk.impl.idsite.IdSiteClaims.*;
-import static com.stormpath.sdk.impl.jwt.JwtHeaderParameters.KEY_ID;
 
 /**
  * @since 1.0.RC8
@@ -150,6 +148,13 @@ public class DefaultSamlCallbackHandler implements SamlCallbackHandler {
             Map<String, Object> account = new HashMap<String, Object>();
             account.put(DefaultAccountResult.HREF_PROP_NAME, accountHref);
             properties.put(DefaultAccountResult.ACCOUNT.getName(), account);
+        }
+
+        String invitationHref = getOptionalValue(jsonPayload, "inv_href");
+        if(Strings.hasText(invitationHref)){
+            Map<String, Object> invitation = new HashMap<String, Object>();
+            invitation.put(DefaultAccountResult.HREF_PROP_NAME, invitationHref);
+            properties.put(DefaultAccountResult.INVITATION.getName(), invitation);
         }
 
         AccountResult accountResult = new DefaultAccountResult(dataStore, properties);

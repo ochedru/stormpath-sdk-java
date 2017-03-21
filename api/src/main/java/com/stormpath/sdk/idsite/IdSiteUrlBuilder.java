@@ -15,6 +15,8 @@
  */
 package com.stormpath.sdk.idsite;
 
+import com.stormpath.sdk.invitation.Invitation;
+
 /**
  * Helps build a URL you can use to redirect your application users to a hosted login/registration/forgot-password site
  * - what Stormpath calls an 'Identity Site' (or 'ID Site' for short) - for performing common user identity
@@ -150,6 +152,8 @@ public interface IdSiteUrlBuilder {
      * @since 1.0.RC5.2
      */
     IdSiteUrlBuilder setSpToken(String spToken);
+
+    IdSiteUrlBuilder setInvitation(Invitation invitation);
 
     /**
      * Convenience method to set any key value. This is important to decouple the server releases from the library
