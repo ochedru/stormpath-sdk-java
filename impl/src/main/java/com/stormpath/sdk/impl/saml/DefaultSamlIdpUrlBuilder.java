@@ -130,9 +130,7 @@ public class DefaultSamlIdpUrlBuilder implements SamlIdpUrlBuilder {
 
     @Override
     public SamlIdpUrlBuilder setInvitation(Invitation invitation) {
-        if(invitation != null){
-            return addProperty("inv_href", invitation.getHref());
-        }
+        claims.setInvitation(invitation);
         return this;
     }
 }

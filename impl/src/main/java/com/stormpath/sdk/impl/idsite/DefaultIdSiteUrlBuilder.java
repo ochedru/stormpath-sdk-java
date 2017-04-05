@@ -168,9 +168,7 @@ public class DefaultIdSiteUrlBuilder implements IdSiteUrlBuilder {
 
     @Override
     public IdSiteUrlBuilder setInvitation(Invitation invitation) {
-        if(invitation != null){
-            return addProperty("inv_href", invitation.getHref());
-        }
+        claims.setInvitation(invitation);
         return this;
     }
 

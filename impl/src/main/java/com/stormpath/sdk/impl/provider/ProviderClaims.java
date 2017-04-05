@@ -15,6 +15,7 @@
  */
 package com.stormpath.sdk.impl.provider;
 
+import com.stormpath.sdk.invitation.Invitation;
 import io.jsonwebtoken.impl.DefaultClaims;
 
 /**
@@ -27,6 +28,7 @@ public class ProviderClaims extends DefaultClaims {
     public static final String STATE = "state";
     public static final String ORGANIZATION_NAME_KEY = "onk";
     public static final String SP_TOKEN = "sp_token";
+    public static final String INV_HREF = "inv_href";
 
     public String getCallbackUri() {
         return getString(CALLBACK_URI);
@@ -70,6 +72,13 @@ public class ProviderClaims extends DefaultClaims {
 
     public ProviderClaims setSpToken(String spToken) {
         setValue(SP_TOKEN, spToken);
+        return this;
+    }
+
+    public ProviderClaims setInvitation(Invitation invitation){
+        if(invitation != null){
+            setValue(INV_HREF, invitation.getHref());
+        }
         return this;
     }
 
