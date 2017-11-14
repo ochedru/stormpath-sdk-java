@@ -439,5 +439,6 @@ public interface Organization extends AccountStoreHolder<Organization>, Resource
     InvitationList getInvitations();
     InvitationList getInvitations(Map<String, Object> queryParams);
     InvitationList getInvitations(InvitationCriteria criteria);
+    OrganizationAccountStoreMapping getDefaultAccountStoreMapping();
 
 }

@@ -290,7 +290,7 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
             groupStore = getDataStore().getResource(store.getHref(), Directory.class);
         }
         if (groupStore == null){
-            throw new IllegalStateException("No groupStore assigned to this organization has been configured as the default storage location for newly created accounts.");
+            throw new IllegalStateException("No groupStore assigned to this organization has been configured as the default storage location for newly created groups.");
         }
         createdGroup = ((Directory) groupStore).createGroup(group);
         return createdGroup;
@@ -449,5 +449,10 @@ public class DefaultOrganization extends AbstractExtendableInstanceResource impl
     public InvitationList getInvitations(InvitationCriteria criteria) {
         InvitationList list = getInvitations(); //safe to get the href: does not execute a query until iteration occurs
         return getDataStore().getResource(list.getHref(), InvitationList.class, (Criteria<InvitationCriteria>) criteria);
+    }
+
+    @Override
+    public OrganizationAccountStoreMapping getDefaultAccountStoreMapping(){
+        return getResourceProperty(DEFAULT_ACCOUNT_STORE_MAPPING);
     }
 }

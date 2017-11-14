@@ -66,4 +66,9 @@ public class DefaultDirectoryOptions extends DefaultOptions<DirectoryOptions> im
     public DirectoryOptions withAccountSchema() {
         return expand(DefaultDirectory.ACCOUNT_SCHEMA);
     }
+
+    @Override
+    public DirectoryOptions withProvider() {
+        return expand(DefaultDirectory.PROVIDER);
+    }
 }

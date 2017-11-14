@@ -32,6 +32,7 @@ import com.stormpath.sdk.authc.UsernamePasswordRequestBuilder;
 import com.stormpath.sdk.directory.AccountStore;
 import com.stormpath.sdk.directory.Directory;
 import com.stormpath.sdk.directory.DirectoryCriteria;
+import com.stormpath.sdk.directory.DirectoryList;
 import com.stormpath.sdk.group.CreateGroupRequest;
 import com.stormpath.sdk.group.Group;
 import com.stormpath.sdk.group.GroupCriteria;
@@ -41,6 +42,7 @@ import com.stormpath.sdk.idsite.IdSiteUrlBuilder;
 import com.stormpath.sdk.oauth.OAuthPolicy;
 import com.stormpath.sdk.organization.Organization;
 import com.stormpath.sdk.organization.OrganizationCriteria;
+import com.stormpath.sdk.organization.OrganizationList;
 import com.stormpath.sdk.provider.ProviderAccountRequest;
 import com.stormpath.sdk.provider.ProviderAccountResult;
 import com.stormpath.sdk.resource.Auditable;
@@ -53,10 +55,6 @@ import com.stormpath.sdk.saml.SamlCallbackHandler;
 import com.stormpath.sdk.saml.SamlIdpUrlBuilder;
 import com.stormpath.sdk.saml.SamlPolicy;
 import com.stormpath.sdk.tenant.Tenant;
-import com.stormpath.sdk.organization.OrganizationCriteria;
-import com.stormpath.sdk.organization.Organization;
-import com.stormpath.sdk.organization.OrganizationList;
-
 import java.util.List;
 import java.util.Map;
 
@@ -1207,8 +1205,12 @@ public interface Application extends AccountStoreHolder<Application>, Resource, 
      * @since 1.2.0
      */
     Application addAuthorizedOriginUri(String authorizedOriginUri);
-    
+
     OrganizationList getOrganizations();
     OrganizationList getOrganizations(Map<String, Object> queryParams);
-    OrganizationList getOrganizationList(OrganizationCriteria criteria);
+    OrganizationList getOrganizations(OrganizationCriteria criteria);
+
+    DirectoryList getDirectories();
+    DirectoryList getDirectories(Map<String, Object> queryParams);
+    DirectoryList getDirectories(DirectoryCriteria criteria);
 }

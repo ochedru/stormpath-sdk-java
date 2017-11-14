@@ -82,4 +82,6 @@ public interface DirectoryCriteria extends Criteria<DirectoryCriteria>, Director
      * @return this instance for method chaining
      */
     DirectoryCriteria orderByStatus();
+
+    DirectoryCriteria withProvider();
 }

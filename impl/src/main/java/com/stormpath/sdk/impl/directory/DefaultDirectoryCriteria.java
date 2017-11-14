@@ -95,4 +95,10 @@ public class DefaultDirectoryCriteria extends DefaultCriteria<DirectoryCriteria,
         getOptions().withAccountSchema();
         return this;
     }
+
+    @Override
+    public DirectoryCriteria withProvider() {
+        getOptions().withProvider();
+        return this;
+    }
 }

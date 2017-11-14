@@ -40,4 +40,6 @@ public interface DirectoryOptions<T extends DirectoryOptions> extends AccountSto
      * @since 1.2.0
      */
     T withAccountSchema();
+
+    T withProvider();
 }

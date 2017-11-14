@@ -51,6 +51,7 @@ import com.stormpath.sdk.idsite.IdSiteCallbackHandler;
 import com.stormpath.sdk.idsite.IdSiteUrlBuilder;
 import com.stormpath.sdk.impl.account.DefaultPasswordResetToken;
 import com.stormpath.sdk.impl.account.DefaultVerificationEmailRequest;
+import static com.stormpath.sdk.impl.api.ApiKeyParameter.ID;
 import com.stormpath.sdk.impl.api.DefaultApiKeyCriteria;
 import com.stormpath.sdk.impl.api.DefaultApiKeyOptions;
 import com.stormpath.sdk.impl.authc.AuthenticationRequestDispatcher;
@@ -101,9 +102,6 @@ import com.stormpath.sdk.saml.SamlCallbackHandler;
 import com.stormpath.sdk.saml.SamlIdpUrlBuilder;
 import com.stormpath.sdk.saml.SamlPolicy;
 import com.stormpath.sdk.tenant.Tenant;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -113,8 +111,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import static com.stormpath.sdk.impl.api.ApiKeyParameter.ID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** @since 0.2 */
 public class DefaultApplication extends AbstractExtendableInstanceResource implements Application {
@@ -199,6 +197,8 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
         new CollectionReference<GroupList, Group>("groups", GroupList.class, Group.class);
     static final CollectionReference<OrganizationList, Organization>  ORGANIZATIONS                 =
         new CollectionReference<OrganizationList, Organization>("organizations", OrganizationList.class, Organization.class);
+    static final CollectionReference<DirectoryList, Directory>  DIRECTORIES                 =
+        new CollectionReference<DirectoryList, Directory>("directories", DirectoryList.class, Directory.class);
     static final CollectionReference<ApplicationAccountStoreMappingList, ApplicationAccountStoreMapping> ACCOUNT_STORE_MAPPINGS =
         new CollectionReference<ApplicationAccountStoreMappingList, ApplicationAccountStoreMapping>("accountStoreMappings",
                                                                               ApplicationAccountStoreMappingList.class,
@@ -300,7 +300,7 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
         GroupList groups = getGroups(); //safe to get the href: does not execute a query until iteration occurs
         return getDataStore().getResource(groups.getHref(), GroupList.class, (Criteria<GroupCriteria>) criteria);
     }
-    
+
     @Override
     public Tenant getTenant() {
         return getResourceProperty(TENANT);
@@ -905,6 +905,7 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
         return new DefaultOAuthBearerRequestAuthenticator(this, getDataStore());
     }
 
+    @Override
     public OrganizationList getOrganizations() {
         return getResourceProperty(ORGANIZATIONS);
     }
@@ -916,9 +917,26 @@ public class DefaultApplication extends AbstractExtendableInstanceResource imple
     }
 
     @Override
-    public OrganizationList getOrganizationList(OrganizationCriteria criteria) {
+    public OrganizationList getOrganizations(OrganizationCriteria criteria) {
         OrganizationList list = getOrganizations(); //safe to get the href: does not execute a query until iteration occurs
         return getDataStore().getResource(list.getHref(), OrganizationList.class, (Criteria<OrganizationCriteria>) criteria);
+    }
+
+    @Override
+    public DirectoryList getDirectories() {
+        return getResourceProperty(DIRECTORIES);
+    }
+
+    @Override
+    public DirectoryList getDirectories(Map<String, Object> queryParams) {
+        DirectoryList list = getDirectories(); //safe to get the href: does not execute a query until iteration occurs
+        return getDataStore().getResource(list.getHref(), DirectoryList.class, queryParams);
+    }
+
+    @Override
+    public DirectoryList getDirectories(DirectoryCriteria criteria) {
+        DirectoryList list = getDirectories(); //safe to get the href: does not execute a query until iteration occurs
+        return getDataStore().getResource(list.getHref(), DirectoryList.class, (Criteria<DirectoryCriteria>) criteria);
     }
 
     /* @since 1.0.RC8.2 */
