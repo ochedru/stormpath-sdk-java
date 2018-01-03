@@ -33,18 +33,15 @@ import com.stormpath.sdk.group.GroupMembershipList;
 import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.oauth.AccessTokenList;
 import com.stormpath.sdk.oauth.RefreshTokenList;
+import com.stormpath.sdk.organization.OrganizationCriteria;
+import com.stormpath.sdk.organization.OrganizationList;
 import com.stormpath.sdk.phone.CreatePhoneRequest;
 import com.stormpath.sdk.phone.Phone;
 import com.stormpath.sdk.phone.PhoneCriteria;
 import com.stormpath.sdk.phone.PhoneList;
 import com.stormpath.sdk.provider.ProviderData;
 import com.stormpath.sdk.resource.ResourceException;
-import com.stormpath.sdk.organization.OrganizationCriteria;
-import com.stormpath.sdk.organization.OrganizationList;
-import com.stormpath.sdk.provider.ProviderData;
-import com.stormpath.sdk.query.Criteria;
 import com.stormpath.sdk.tenant.Tenant;
-
 import java.util.Date;
 import java.util.Map;
 
@@ -295,17 +292,17 @@ public class ImmutableAccount implements Account {
     public ApplicationList getApplications(ApplicationCriteria criteria) {
         return account.getApplications(criteria);
     }
-    
+
     @Override
     public OrganizationList getOrganizations(){
          return account.getOrganizations();
     }
-    
+
     @Override
     public OrganizationList getOrganizations(Map<String, Object> queryParams){
         return account.getOrganizations(queryParams);
     }
-    
+
     @Override
     public OrganizationList getOrganizations(OrganizationCriteria criteria){
         return account.getOrganizations(criteria);
@@ -480,5 +477,15 @@ public class ImmutableAccount implements Account {
         return account.getPasswordModifiedAt();
     }
 
+    @Override
+    public boolean isPasswordAuthenticationAllowed(){
+        return account.isPasswordAuthenticationAllowed();
+    }
+
+    @Override
+    public Account setPasswordAuthenticationAllowed(boolean passwordAuthenticationAllowed){
+        immutable();
+        return null;
+    }
 
 }

@@ -33,6 +33,7 @@ import com.stormpath.sdk.impl.oauth.DefaultAccessTokenList
 import com.stormpath.sdk.impl.oauth.DefaultRefreshTokenList
 import com.stormpath.sdk.impl.provider.DefaultProviderData
 import com.stormpath.sdk.impl.provider.IdentityProviderType
+import com.stormpath.sdk.impl.resource.BooleanProperty
 import com.stormpath.sdk.impl.resource.CollectionReference
 import com.stormpath.sdk.impl.resource.DateProperty
 import com.stormpath.sdk.impl.resource.ResourceReference
@@ -63,7 +64,7 @@ class DefaultAccountTest {
 
         def propertyDescriptors = defaultAccount.getPropertyDescriptors()
 
-        assertEquals(propertyDescriptors.size(), 25)
+        assertEquals(propertyDescriptors.size(), 26)
 
         assertTrue(propertyDescriptors.get("username") instanceof StringProperty)
         assertTrue(propertyDescriptors.get("email") instanceof StringProperty)
@@ -90,6 +91,7 @@ class DefaultAccountTest {
         assertTrue(propertyDescriptors.get("phones") instanceof CollectionReference && propertyDescriptors.get("phones").getType().equals(PhoneList))
         assertTrue(propertyDescriptors.get("factors") instanceof CollectionReference && propertyDescriptors.get("factors").getType().equals(FactorList))
         assertTrue(propertyDescriptors.get("passwordModifiedAt") instanceof DateProperty)
+        assertTrue(propertyDescriptors.get("passwordAuthenticationAllowed") instanceof BooleanProperty)
     }
 
     @Test

@@ -21,8 +21,6 @@ import com.stormpath.sdk.api.ApiKeyList;
 import com.stormpath.sdk.api.ApiKeyOptions;
 import com.stormpath.sdk.application.ApplicationCriteria;
 import com.stormpath.sdk.application.ApplicationList;
-import com.stormpath.sdk.organization.OrganizationCriteria;
-import com.stormpath.sdk.organization.OrganizationList;
 import com.stormpath.sdk.authc.AuthenticationRequest;
 import com.stormpath.sdk.directory.Directory;
 import com.stormpath.sdk.factor.*;
@@ -33,6 +31,8 @@ import com.stormpath.sdk.group.GroupMembership;
 import com.stormpath.sdk.group.GroupMembershipList;
 import com.stormpath.sdk.oauth.AccessTokenList;
 import com.stormpath.sdk.oauth.RefreshTokenList;
+import com.stormpath.sdk.organization.OrganizationCriteria;
+import com.stormpath.sdk.organization.OrganizationList;
 import com.stormpath.sdk.phone.CreatePhoneRequest;
 import com.stormpath.sdk.phone.Phone;
 import com.stormpath.sdk.phone.PhoneCriteria;
@@ -40,7 +40,6 @@ import com.stormpath.sdk.phone.PhoneList;
 import com.stormpath.sdk.provider.ProviderData;
 import com.stormpath.sdk.resource.*;
 import com.stormpath.sdk.tenant.Tenant;
-
 import java.util.Date;
 import java.util.Map;
 
@@ -972,8 +971,11 @@ public interface Account extends Resource, Saveable, Deletable, Extendable, Audi
      * @since 1.2.0
      */
     Date getPasswordModifiedAt();
-    
+
     OrganizationList getOrganizations();
     OrganizationList getOrganizations(Map<String, Object> queryParams);
     OrganizationList getOrganizations(OrganizationCriteria criteria);
+    boolean isPasswordAuthenticationAllowed();
+    Account setPasswordAuthenticationAllowed(boolean passwordAuthenticationAllowed);
+
 }

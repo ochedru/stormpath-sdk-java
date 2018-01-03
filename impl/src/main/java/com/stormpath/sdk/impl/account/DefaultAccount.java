@@ -12,7 +12,7 @@
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-*/
+ */
 package com.stormpath.sdk.impl.account;
 
 import com.stormpath.sdk.account.Account;
@@ -32,9 +32,6 @@ import com.stormpath.sdk.api.ApiKeyOptions;
 import com.stormpath.sdk.application.Application;
 import com.stormpath.sdk.application.ApplicationCriteria;
 import com.stormpath.sdk.application.ApplicationList;
-import com.stormpath.sdk.organization.Organization;
-import com.stormpath.sdk.organization.OrganizationCriteria;
-import com.stormpath.sdk.organization.OrganizationList;
 import com.stormpath.sdk.directory.Directory;
 import com.stormpath.sdk.factor.CreateFactorRequest;
 import com.stormpath.sdk.factor.Factor;
@@ -54,6 +51,7 @@ import com.stormpath.sdk.impl.ds.InternalDataStore;
 import com.stormpath.sdk.impl.group.DefaultGroupMembership;
 import com.stormpath.sdk.impl.provider.IdentityProviderType;
 import com.stormpath.sdk.impl.resource.AbstractExtendableInstanceResource;
+import com.stormpath.sdk.impl.resource.BooleanProperty;
 import com.stormpath.sdk.impl.resource.CollectionReference;
 import com.stormpath.sdk.impl.resource.DateProperty;
 import com.stormpath.sdk.impl.resource.EnumProperty;
@@ -66,6 +64,9 @@ import com.stormpath.sdk.oauth.AccessToken;
 import com.stormpath.sdk.oauth.AccessTokenList;
 import com.stormpath.sdk.oauth.RefreshToken;
 import com.stormpath.sdk.oauth.RefreshTokenList;
+import com.stormpath.sdk.organization.Organization;
+import com.stormpath.sdk.organization.OrganizationCriteria;
+import com.stormpath.sdk.organization.OrganizationList;
 import com.stormpath.sdk.phone.CreatePhoneRequest;
 import com.stormpath.sdk.phone.Phone;
 import com.stormpath.sdk.phone.PhoneCriteria;
@@ -74,7 +75,6 @@ import com.stormpath.sdk.provider.ProviderData;
 import com.stormpath.sdk.query.Criteria;
 import com.stormpath.sdk.resource.ResourceException;
 import com.stormpath.sdk.tenant.Tenant;
-
 import java.util.Date;
 import java.util.Map;
 
@@ -96,51 +96,52 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     static final EnumProperty<EmailVerificationStatus> EMAIL_VERIFICATION_STATUS = new EnumProperty<>("emailVerificationStatus", EmailVerificationStatus.class);
     // @since 1.2.0
     public static final DateProperty PASSWORD_MODIFIED_AT = new DateProperty("passwordModifiedAt");
+    public static final BooleanProperty PASSWORD_AUTHENTICATION_ALLOWED = new BooleanProperty("passwordAuthenticationAllowed");
 
     // INSTANCE RESOURCE REFERENCES:
-    static final ResourceReference<EmailVerificationToken> EMAIL_VERIFICATION_TOKEN =
-            new ResourceReference<>("emailVerificationToken", EmailVerificationToken.class);
+    static final ResourceReference<EmailVerificationToken> EMAIL_VERIFICATION_TOKEN
+            = new ResourceReference<>("emailVerificationToken", EmailVerificationToken.class);
     static final ResourceReference<Directory> DIRECTORY = new ResourceReference<>("directory", Directory.class);
     static final ResourceReference<Tenant> TENANT = new ResourceReference<>("tenant", Tenant.class);
     static final ResourceReference<ProviderData> PROVIDER_DATA = new ResourceReference<>("providerData", ProviderData.class);
 
     // COLLECTION RESOURCE REFERENCES:
-    static final CollectionReference<GroupList, Group> GROUPS =
-            new CollectionReference<>("groups", GroupList.class, Group.class);
-    static final CollectionReference<GroupMembershipList, GroupMembership> GROUP_MEMBERSHIPS =
-            new CollectionReference<>("groupMemberships", GroupMembershipList.class, GroupMembership.class);
-    static final CollectionReference<ApiKeyList, ApiKey> API_KEYS =
-            new CollectionReference<>("apiKeys", ApiKeyList.class, ApiKey.class);
+    static final CollectionReference<GroupList, Group> GROUPS
+            = new CollectionReference<>("groups", GroupList.class, Group.class);
+    static final CollectionReference<GroupMembershipList, GroupMembership> GROUP_MEMBERSHIPS
+            = new CollectionReference<>("groupMemberships", GroupMembershipList.class, GroupMembership.class);
+    static final CollectionReference<ApiKeyList, ApiKey> API_KEYS
+            = new CollectionReference<>("apiKeys", ApiKeyList.class, ApiKey.class);
     // @since 1.0.RC4
-    static final CollectionReference<ApplicationList, Application> APPLICATIONS =
-            new CollectionReference<>("applications", ApplicationList.class, Application.class);
-    
-    static final CollectionReference<OrganizationList, Organization> ORGANIZATIONS =
-            new CollectionReference<>("organizations", OrganizationList.class, Organization.class);
+    static final CollectionReference<ApplicationList, Application> APPLICATIONS
+            = new CollectionReference<>("applications", ApplicationList.class, Application.class);
+
+    static final CollectionReference<OrganizationList, Organization> ORGANIZATIONS
+            = new CollectionReference<>("organizations", OrganizationList.class, Organization.class);
 
     // @since 1.0.RC7
-    static final CollectionReference<AccessTokenList, AccessToken> ACCESS_TOKENS =
-            new CollectionReference<>("accessTokens", AccessTokenList.class, AccessToken.class);
+    static final CollectionReference<AccessTokenList, AccessToken> ACCESS_TOKENS
+            = new CollectionReference<>("accessTokens", AccessTokenList.class, AccessToken.class);
 
-    static final CollectionReference<RefreshTokenList, RefreshToken> REFRESH_TOKENS =
-            new CollectionReference<>("refreshTokens", RefreshTokenList.class, RefreshToken.class);
+    static final CollectionReference<RefreshTokenList, RefreshToken> REFRESH_TOKENS
+            = new CollectionReference<>("refreshTokens", RefreshTokenList.class, RefreshToken.class);
 
-    static final CollectionReference<PhoneList, Phone> PHONES =
-            new CollectionReference<>("phones", PhoneList.class, Phone.class);
+    static final CollectionReference<PhoneList, Phone> PHONES
+            = new CollectionReference<>("phones", PhoneList.class, Phone.class);
 
-    static final CollectionReference<? extends FactorList, Factor> FACTORS =
-            new CollectionReference<>("factors", FactorList.class, Factor.class);
+    static final CollectionReference<? extends FactorList, Factor> FACTORS
+            = new CollectionReference<>("factors", FactorList.class, Factor.class);
 
-    static final CollectionReference<AccountList, Account> LINKED_ACCOUNTS =
-            new CollectionReference<>("linkedAccounts", AccountList.class, Account.class);
+    static final CollectionReference<AccountList, Account> LINKED_ACCOUNTS
+            = new CollectionReference<>("linkedAccounts", AccountList.class, Account.class);
 
-    static final CollectionReference<AccountLinkList, AccountLink> ACCOUNT_LINKS =
-            new CollectionReference<>("accountLinks", AccountLinkList.class, AccountLink.class);
+    static final CollectionReference<AccountLinkList, AccountLink> ACCOUNT_LINKS
+            = new CollectionReference<>("accountLinks", AccountLinkList.class, AccountLink.class);
 
     static final Map<String, Property> PROPERTY_DESCRIPTORS = createPropertyDescriptorMap(
             USERNAME, EMAIL, PASSWORD, GIVEN_NAME, MIDDLE_NAME, SURNAME, STATUS, FULL_NAME,
             EMAIL_VERIFICATION_TOKEN, EMAIL_VERIFICATION_STATUS, CUSTOM_DATA, DIRECTORY, TENANT, GROUPS, GROUP_MEMBERSHIPS,
-            PROVIDER_DATA, API_KEYS, APPLICATIONS, ACCESS_TOKENS, REFRESH_TOKENS, LINKED_ACCOUNTS, ACCOUNT_LINKS, PHONES, FACTORS, PASSWORD_MODIFIED_AT);
+            PROVIDER_DATA, API_KEYS, APPLICATIONS, ACCESS_TOKENS, REFRESH_TOKENS, LINKED_ACCOUNTS, ACCOUNT_LINKS, PHONES, FACTORS, PASSWORD_MODIFIED_AT, PASSWORD_AUTHENTICATION_ALLOWED);
 
     public DefaultAccount(InternalDataStore dataStore) {
         super(dataStore);
@@ -284,13 +285,12 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
         return getDataStore().getResource(list.getHref(), PhoneList.class, queryParams);
     }
 
-
     @Override
     public FactorList getFactors() {
         FactorList factors = getResourceProperty(FACTORS);
         // necessary to materialize Challenge to determine type
         // fixes https://github.com/stormpath/stormpath-sdk-java/issues/1292
-        return getDataStore().getResource(factors.getHref(), FactorList.class, (Criteria)Factors.criteria().withMostRecentChallenge());
+        return getDataStore().getResource(factors.getHref(), FactorList.class, (Criteria) Factors.criteria().withMostRecentChallenge());
     }
 
     @Override
@@ -496,8 +496,8 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
             return providerData;
         }
 
-        String msg = "'" + PROVIDER_DATA.getName() + "' property value type does not match the specified type. Specified type: " +
-                PROVIDER_DATA.getType() + ".  Existing type: " + value.getClass().getName() + ".  Value: " + value;
+        String msg = "'" + PROVIDER_DATA.getName() + "' property value type does not match the specified type. Specified type: "
+                + PROVIDER_DATA.getType() + ".  Existing type: " + value.getClass().getName() + ".  Value: " + value;
         throw new IllegalStateException(msg);
     }
 
@@ -556,20 +556,20 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
         ApplicationList proxy = getApplications(); //just a proxy - does not execute a query until iteration occurs
         return getDataStore().getResource(proxy.getHref(), ApplicationList.class, (Criteria<ApplicationCriteria>) criteria);
     }
-    
+
     @Override
-    public OrganizationList getOrganizations(){
-         return getResourceProperty(ORGANIZATIONS);
+    public OrganizationList getOrganizations() {
+        return getResourceProperty(ORGANIZATIONS);
     }
-    
+
     @Override
-    public OrganizationList getOrganizations(Map<String, Object> queryParams){
+    public OrganizationList getOrganizations(Map<String, Object> queryParams) {
         OrganizationList proxy = getOrganizations(); //just a proxy - does not execute a query until iteration occurs
         return getDataStore().getResource(proxy.getHref(), OrganizationList.class, queryParams);
     }
-    
+
     @Override
-    public OrganizationList getOrganizations(OrganizationCriteria criteria){
+    public OrganizationList getOrganizations(OrganizationCriteria criteria) {
         OrganizationList proxy = getOrganizations(); //just a proxy - does not execute a query until iteration occurs
         return getDataStore().getResource(proxy.getHref(), OrganizationList.class, (Criteria<OrganizationCriteria>) criteria);
     }
@@ -691,7 +691,6 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
         return getDataStore().getResource(list.getHref(), AccountLinkList.class, (Criteria<AccountLinkCriteria>) criteria);
     }
 
-
     @Override
     public Phone createPhone(CreatePhoneRequest request) {
         Assert.notNull(request, "Request cannot be null.");
@@ -738,5 +737,15 @@ public class DefaultAccount extends AbstractExtendableInstanceResource implement
     public Date getPasswordModifiedAt() {
         return getDateProperty(PASSWORD_MODIFIED_AT);
     }
-}
 
+    @Override
+    public boolean isPasswordAuthenticationAllowed() {
+        return getBoolean(PASSWORD_AUTHENTICATION_ALLOWED);
+    }
+
+    @Override
+    public Account setPasswordAuthenticationAllowed(boolean passwordAuthenticationAllowed) {
+        setProperty(PASSWORD_AUTHENTICATION_ALLOWED, passwordAuthenticationAllowed);
+        return this;
+    }
+}

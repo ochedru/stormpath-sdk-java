@@ -393,7 +393,7 @@ class RegisterControllerTest {
         final List<String> NON_SIMPLE_PROPERTIES = Collections.unmodifiableList(Arrays.asList(
                 "fullName", "status", "customData", "emailVerificationToken", "emailVerificationStatus","directory", "tenant",
                 "providerData", "groups", "groupMemberships", "apiKeys", "applications", "accessTokens",
-                "refreshTokens", "accountLinks", "linkedAccounts", "phones", "factors", "passwordModifiedAt"))
+                "refreshTokens", "accountLinks", "linkedAccounts", "phones", "factors", "passwordModifiedAt", "passwordAuthenticationAllowed"))
 
         def actualSimpleProperties = DefaultAccount.PROPERTY_DESCRIPTORS.keySet().asList()
         actualSimpleProperties.removeAll(NON_SIMPLE_PROPERTIES)

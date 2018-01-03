@@ -16,6 +16,7 @@
 package com.stormpath.sdk.provider.saml;
 
 import com.stormpath.sdk.provider.Provider;
+import com.stormpath.sdk.resource.Saveable;
 import com.stormpath.sdk.saml.AttributeStatementMappingRules;
 import com.stormpath.sdk.saml.SamlServiceProviderMetadata;
 
@@ -25,7 +26,7 @@ import com.stormpath.sdk.saml.SamlServiceProviderMetadata;
  *
  * @since 1.0.RC8
  */
-public interface SamlProvider extends Provider {
+public interface SamlProvider extends Provider, Saveable {
 
     /**
      * Returns the URL at the SAML Identity Provider where end-users should be redirected to login. This is often called

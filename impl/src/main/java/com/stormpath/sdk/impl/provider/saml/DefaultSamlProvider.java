@@ -26,7 +26,6 @@ import com.stormpath.sdk.lang.Assert;
 import com.stormpath.sdk.provider.saml.SamlProvider;
 import com.stormpath.sdk.saml.AttributeStatementMappingRules;
 import com.stormpath.sdk.saml.SamlServiceProviderMetadata;
-
 import java.util.Map;
 
 /**
@@ -44,7 +43,7 @@ public class DefaultSamlProvider extends AbstractProvider implements SamlProvide
     // INSTANCE RESOURCE REFERENCES:
     static final ResourceReference<AttributeStatementMappingRules> ATTRIBUTE_STATEMENT_MAPPING_RULES = new ResourceReference<AttributeStatementMappingRules>("attributeStatementMappingRules", AttributeStatementMappingRules.class);
 
-    static final ResourceReference<SamlServiceProviderMetadata> SERVICE_PROVIDER_METADATA  = new ResourceReference<SamlServiceProviderMetadata>("serviceProviderMetadata", SamlServiceProviderMetadata.class);
+    static final ResourceReference<SamlServiceProviderMetadata> SERVICE_PROVIDER_METADATA  = new ResourceReference<SamlServiceProviderMetadata>("samlServiceProviderMetadata", SamlServiceProviderMetadata.class);
 
     static final Map<String,Property> PROPERTY_DESCRIPTORS = createPropertyDescriptorMap(PROVIDER_ID, CREATED_AT, MODIFIED_AT, SSO_LOGIN_URL, SSO_LOGOUT_URL, ENCODED_X509_SIGNING_CERT, REQUEST_SIGNATURE_ALGORITHM, FORCE_AUTHN, SERVICE_PROVIDER_METADATA, ATTRIBUTE_STATEMENT_MAPPING_RULES);
 
@@ -128,5 +127,10 @@ public class DefaultSamlProvider extends AbstractProvider implements SamlProvide
     @Override
     public void setForceAuthn(boolean forceAuthn) {
         setProperty(FORCE_AUTHN, forceAuthn);
+    }
+
+    @Override
+    public void save() {
+        getDataStore().save(this);
     }
 }
