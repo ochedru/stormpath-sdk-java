@@ -104,6 +104,12 @@ public class DefaultIdSiteUrlBuilder implements IdSiteUrlBuilder {
     }
 
     @Override
+    public IdSiteUrlBuilder setRequireOrganizationSelection(boolean requireOrganizationSelection){
+        claims.setRequireOrganizationSelection(requireOrganizationSelection);
+        return this;
+    }
+
+    @Override
     public IdSiteUrlBuilder setSpToken(String spToken) {
         claims.setSpToken(spToken);
         return this;

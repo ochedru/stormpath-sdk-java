@@ -157,9 +157,16 @@ public class DefaultIdSiteCallbackHandler implements IdSiteCallbackHandler {
 
         String invitationHref = getOptionalValue(jsonPayload, "inv_href");
         if(Strings.hasText(invitationHref)){
-            Map<String, Object> invitation = new HashMap<String, Object>();
+            Map<String, Object> invitation = new HashMap<>();
             invitation.put(DefaultAccountResult.HREF_PROP_NAME, invitationHref);
             properties.put(DefaultAccountResult.INVITATION.getName(), invitation);
+        }
+
+        String organizationHref = getOptionalValue(jsonPayload, "org_href");
+        if(Strings.hasText(organizationHref)){
+            Map<String, Object> organization = new HashMap<>();
+            organization.put(DefaultAccountResult.HREF_PROP_NAME, organizationHref);
+            properties.put(DefaultAccountResult.ORGANIZATION.getName(), organization);
         }
 
         AccountResult accountResult = new DefaultAccountResult(dataStore, properties);

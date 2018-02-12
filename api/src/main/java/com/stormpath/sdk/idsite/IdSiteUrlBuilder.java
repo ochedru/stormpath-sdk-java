@@ -130,6 +130,8 @@ public interface IdSiteUrlBuilder {
      * @since 1.0.RC5
      */
     IdSiteUrlBuilder setShowOrganizationField(boolean showOrganizationField);
+    
+    IdSiteUrlBuilder setRequireOrganizationSelection(boolean requireOrganizationSelection);
 
     /**
      * Sets the {@code sp_token} property used by the {@code IdSite} to complete an account password reset workflow. The

@@ -27,6 +27,7 @@ import com.stormpath.sdk.impl.provider.ProviderClaims;
 public class IdSiteClaims extends ProviderClaims {
 
     public static final String SHOW_ORGANIZATION_FIELD = "sof";
+    public static final String REQUIRE_ORGANIZATION_SELECTION = "ros";
     public static final String USE_SUBDOMAIN = "usd";
 
     public static final String ACCESS_TOKEN = "accessToken";
@@ -58,6 +59,15 @@ public class IdSiteClaims extends ProviderClaims {
 
     public IdSiteClaims setShowOrganizationField(boolean showOrganizationField) {
         setValue(SHOW_ORGANIZATION_FIELD, showOrganizationField);
+        return this;
+    }
+
+    public Boolean getRequireOrganizationSelection() {
+        return getBoolean(REQUIRE_ORGANIZATION_SELECTION);
+    }
+
+    public IdSiteClaims setRequireOrganizationSelection(boolean requireOrganizationSelection){
+        setValue(REQUIRE_ORGANIZATION_SELECTION, requireOrganizationSelection);
         return this;
     }
 

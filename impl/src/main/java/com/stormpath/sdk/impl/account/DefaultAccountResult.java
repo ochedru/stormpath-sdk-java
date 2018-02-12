@@ -10,6 +10,7 @@ import com.stormpath.sdk.impl.resource.Property;
 import com.stormpath.sdk.impl.resource.ResourceReference;
 import com.stormpath.sdk.impl.resource.StringProperty;
 import com.stormpath.sdk.invitation.Invitation;
+import com.stormpath.sdk.organization.Organization;
 import java.util.Map;
 
 /**
@@ -27,6 +28,7 @@ public class DefaultAccountResult extends AbstractResource implements AccountRes
     // INSTANCE RESOURCE REFERENCES:
     public static final ResourceReference<Account> ACCOUNT = new ResourceReference<Account>("account", Account.class);
     public static final ResourceReference<Invitation> INVITATION = new ResourceReference<Invitation>("invitation", Invitation.class);
+    public static final ResourceReference<Organization> ORGANIZATION = new ResourceReference<Organization>("invitation", Organization.class);
 
     private static final Map<String, Property> PROPERTY_DESCRIPTORS = createPropertyDescriptorMap(NEW_ACCOUNT, ACCOUNT);
 
@@ -73,5 +75,10 @@ public class DefaultAccountResult extends AbstractResource implements AccountRes
     @Override
     public Invitation getInvitation() {
         return getResourceProperty(INVITATION);
+    }
+
+    @Override
+    public Organization getOrganization() {
+        return getResourceProperty(ORGANIZATION);
     }
 }
