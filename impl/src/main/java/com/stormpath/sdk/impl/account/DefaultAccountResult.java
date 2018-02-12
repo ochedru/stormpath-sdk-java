@@ -28,7 +28,7 @@ public class DefaultAccountResult extends AbstractResource implements AccountRes
     // INSTANCE RESOURCE REFERENCES:
     public static final ResourceReference<Account> ACCOUNT = new ResourceReference<Account>("account", Account.class);
     public static final ResourceReference<Invitation> INVITATION = new ResourceReference<Invitation>("invitation", Invitation.class);
-    public static final ResourceReference<Organization> ORGANIZATION = new ResourceReference<Organization>("invitation", Organization.class);
+    public static final ResourceReference<Organization> ORGANIZATION = new ResourceReference<Organization>("organization", Organization.class);
 
     private static final Map<String, Property> PROPERTY_DESCRIPTORS = createPropertyDescriptorMap(NEW_ACCOUNT, ACCOUNT);
 
